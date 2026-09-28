@@ -12,6 +12,8 @@ import { generateBugFromObjective } from './services/bugGenerator';
 import { DEFAULT_AI_CONFIG } from './services/aiService';
 import { Sparkles } from 'lucide-react';
 
+import { BLANK_BUG_TEMPLATE } from './data/blankBug';
+
 export default function App() {
   const [theme, setTheme] = useState(localStorage.getItem('sentinx_theme') || 'dark');
   const [selectedScenarioId, setSelectedScenarioId] = useState(MOCK_SCENARIOS[0].id);
@@ -102,15 +104,29 @@ export default function App() {
   const handleSelectScenario = async (scenario) => {
     setSelectedScenarioId(scenario.id);
     const structured = await generateBugFromObjective(scenario.report.title, scenario.logs, aiConfig);
-    const merged = { ...scenario.report, ...structured, objective: scenario.report.title };
+    const merged = { ...scenario.report, ...structured, objective: scenario.report.title, isCustom: false };
     setReport(merged);
     setLogs(scenario.logs);
     setCreatedJiraTicket(null);
     executeAnalysis(merged, scenario.logs);
   };
 
+  const handleCreateNewBug = () => {
+    setSelectedScenarioId('new-custom-bug');
+    const newBug = { ...BLANK_BUG_TEMPLATE, isCustom: true };
+    setReport(newBug);
+    setLogs("");
+    setCreatedJiraTicket(null);
+    setLinkedBugs({});
+    executeAnalysis(newBug, "");
+  };
+
   const handleRunAnalysis = () => {
     executeAnalysis(report, logs);
+  };
+
+  const handleRunAnalysisWith = (customReport, customLogs) => {
+    executeAnalysis(customReport, customLogs);
   };
 
   const handleCreateJiraBug = async () => {
@@ -155,6 +171,19 @@ export default function App() {
           <span>💡 Quick Incident Objectives:</span>
         </div>
         <div className="scenario-chips-wrapper">
+          <button
+            className={`scenario-chip ${selectedScenarioId === 'new-custom-bug' ? 'active' : ''}`}
+            style={{
+              background: selectedScenarioId === 'new-custom-bug' ? 'linear-gradient(135deg, #10b981, #059669)' : 'rgba(16, 185, 129, 0.15)',
+              borderColor: '#10b981',
+              color: selectedScenarioId === 'new-custom-bug' ? '#fff' : '#34d399',
+              fontWeight: 700
+            }}
+            onClick={handleCreateNewBug}
+            title="Start a new blank bug report"
+          >
+            <span>➕ Create New Bug</span>
+          </button>
           {MOCK_SCENARIOS.map((scenario) => (
             <button
               key={scenario.id}
@@ -177,6 +206,9 @@ export default function App() {
             logs={logs}
             setLogs={setLogs}
             onRunAnalysis={handleRunAnalysis}
+            onRunAnalysisWith={handleRunAnalysisWith}
+            onCreateNewBug={handleCreateNewBug}
+            onClearJiraTicket={() => setCreatedJiraTicket(null)}
             isAnalyzing={isAnalyzing}
             onCreateJiraBug={handleCreateJiraBug}
             createdJiraTicket={createdJiraTicket}

@@ -74,13 +74,6 @@ export function TriageResultPanel({
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const toggleStepDone = (id) => {
-    setCompletedSteps(prev => ({
-      ...prev,
-      [id]: !prev[id]
-    }));
-  };
-
   const isCritical = triageEvaluation.severity === "P0";
   const isHigh = triageEvaluation.severity === "P1";
   const isMedium = triageEvaluation.severity === "P2";

@@ -33,6 +33,9 @@ export function BugInputPanel({
   logs,
   setLogs,
   onRunAnalysis,
+  onRunAnalysisWith,
+  onCreateNewBug,
+  onClearJiraTicket,
   isAnalyzing,
   onCreateJiraBug,
   createdJiraTicket,
@@ -49,21 +52,35 @@ export function BugInputPanel({
 
   // Keep input in sync with loaded scenario or external report changes
   useEffect(() => {
-    if (report.objective || report.title) {
-      setObjectiveInput(report.objective || report.title);
+    if (report.objective !== undefined || report.title !== undefined) {
+      setObjectiveInput(report.objective || report.title || "");
     }
   }, [report.objective, report.title]);
 
   const handleGenerateFromObjective = async () => {
     if (!objectiveInput.trim()) return;
     setIsGeneratingDetails(true);
-    await new Promise(r => setTimeout(r, 200));
-    const generated = await generateBugFromObjective(objectiveInput, logs, aiConfig);
-    setReport(prev => ({
-      ...prev,
-      ...generated
-    }));
-    setIsGeneratingDetails(false);
+    try {
+      const generated = await generateBugFromObjective(objectiveInput, logs, aiConfig);
+      const newLogs = generated.logs || logs;
+      const updatedReport = {
+        ...report,
+        ...generated,
+        isCustom: true
+      };
+      setReport(updatedReport);
+      if (generated.logs) {
+        setLogs(newLogs);
+      }
+      onClearJiraTicket?.();
+      if (onRunAnalysisWith) {
+        onRunAnalysisWith(updatedReport, newLogs);
+      }
+    } catch (err) {
+      console.error("Failed to generate bug from objective:", err);
+    } finally {
+      setIsGeneratingDetails(false);
+    }
   };
 
   const processMediaFile = (file) => {
@@ -79,8 +96,8 @@ export function BugInputPanel({
       
       const extracted = await aiExtractBugFromMedia(file, dataUrl, aiConfig);
       
-      setReport(prev => ({
-        ...prev,
+      const updatedReport = {
+        ...report,
         ...extracted,
         attachment: {
           name: file.name,
@@ -89,11 +106,23 @@ export function BugInputPanel({
           dataUrl,
           previewUrl,
           isVideo
-        }
-      }));
-      setObjectiveInput(extracted.objective);
+        },
+        isCustom: true
+      };
+
+      setReport(updatedReport);
+      setObjectiveInput(extracted.objective || "");
+      
+      const newLogs = extracted.logs || `[${new Date().toISOString()}] ERROR [${extracted.moduleName || 'Client'}] UI exception rendered on client viewport\n${extracted.component || 'web'}.ClientException: Visual defect in ${file.name}`;
+      setLogs(newLogs);
+      
+      onClearJiraTicket?.();
       setMediaNotification(`✨ Bug details extracted from ${isVideo ? 'Video' : 'Screenshot'}: "${file.name}"`);
       setIsExtractingMedia(false);
+
+      if (onRunAnalysisWith) {
+        onRunAnalysisWith(updatedReport, newLogs);
+      }
     };
     reader.onerror = () => {
       setMediaNotification("❌ Failed to read media file.");
@@ -175,6 +204,30 @@ export function BugInputPanel({
             </p>
           </div>
         </div>
+
+        {onCreateNewBug && (
+          <button
+            type="button"
+            className="btn-secondary"
+            style={{
+              padding: '0.35rem 0.75rem',
+              fontSize: '0.78rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              borderColor: 'rgba(16, 185, 129, 0.45)',
+              color: '#34d399',
+              background: 'rgba(16, 185, 129, 0.12)',
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
+            onClick={onCreateNewBug}
+            title="Clear and create a brand new bug"
+          >
+            <PlusCircle size={14} />
+            <span>➕ Create New Bug</span>
+          </button>
+        )}
       </div>
 
       <div className="panel-body">
@@ -376,7 +429,7 @@ export function BugInputPanel({
             <input
               type="text"
               value={report.title || ""}
-              onChange={(e) => setReport({ ...report, title: e.target.value })}
+              onChange={(e) => setReport(prev => ({ ...prev, title: e.target.value, isCustom: true }))}
               placeholder="e.g. Payment Gateway 500 Error: NullPointerException in TaxCalculator"
             />
           </div>
@@ -389,7 +442,7 @@ export function BugInputPanel({
             <textarea
               rows={3}
               value={report.description || ""}
-              onChange={(e) => setReport({ ...report, description: e.target.value })}
+              onChange={(e) => setReport(prev => ({ ...prev, description: e.target.value, isCustom: true }))}
               placeholder="Full description of the bug..."
             />
           </div>
@@ -401,7 +454,7 @@ export function BugInputPanel({
               <input
                 type="text"
                 value={report.component || ""}
-                onChange={(e) => setReport({ ...report, component: e.target.value })}
+                onChange={(e) => setReport(prev => ({ ...prev, component: e.target.value, isCustom: true }))}
                 placeholder="e.g. payment-gateway"
               />
             </div>
@@ -410,7 +463,7 @@ export function BugInputPanel({
               <input
                 type="text"
                 value={report.moduleName || ""}
-                onChange={(e) => setReport({ ...report, moduleName: e.target.value })}
+                onChange={(e) => setReport(prev => ({ ...prev, moduleName: e.target.value, isCustom: true }))}
                 placeholder="e.g. TaxCalculationModule"
               />
             </div>
@@ -419,7 +472,7 @@ export function BugInputPanel({
               <input
                 type="text"
                 value={report.impactedSprint || "Sprint 42 (Q3-Core)"}
-                onChange={(e) => setReport({ ...report, impactedSprint: e.target.value })}
+                onChange={(e) => setReport(prev => ({ ...prev, impactedSprint: e.target.value, isCustom: true }))}
                 placeholder="e.g. Sprint 42"
               />
             </div>
@@ -430,7 +483,15 @@ export function BugInputPanel({
               <label className="form-label">Priority</label>
               <select
                 value={report.priority || "High"}
-                onChange={(e) => setReport({ ...report, priority: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setReport(prev => ({ 
+                    ...prev, 
+                    priority: val, 
+                    severity: val === 'Critical' ? 'P0 - Blocker' : val === 'High' ? 'P1 - High' : val === 'Medium' ? 'P2 - Medium' : 'P3 - Low',
+                    isCustom: true 
+                  }));
+                }}
               >
                 <option value="Critical">Critical</option>
                 <option value="High">High</option>
@@ -442,7 +503,15 @@ export function BugInputPanel({
               <label className="form-label">Severity</label>
               <select
                 value={report.severity || "P0 - Blocker"}
-                onChange={(e) => setReport({ ...report, severity: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setReport(prev => ({ 
+                    ...prev, 
+                    severity: val,
+                    priority: val.includes('P0') ? 'Critical' : val.includes('P1') ? 'High' : val.includes('P2') ? 'Medium' : 'Low',
+                    isCustom: true 
+                  }));
+                }}
               >
                 <option value="P0 - Blocker">P0 - Blocker (Critical Outage)</option>
                 <option value="P1 - High">P1 - High (Core Degraded)</option>
@@ -461,7 +530,7 @@ export function BugInputPanel({
               <textarea
                 rows={3}
                 value={Array.isArray(report.preconditions) ? report.preconditions.join('\n') : (report.preconditions || "")}
-                onChange={(e) => setReport({ ...report, preconditions: e.target.value.split('\n') })}
+                onChange={(e) => setReport(prev => ({ ...prev, preconditions: e.target.value.split('\n'), isCustom: true }))}
                 placeholder="• User is guest&#10;• Card is 3DS enabled"
               />
             </div>
@@ -473,7 +542,7 @@ export function BugInputPanel({
               <textarea
                 rows={3}
                 value={Array.isArray(report.stepsToReproduce) ? report.stepsToReproduce.join('\n') : (report.stepsToReproduce || "")}
-                onChange={(e) => setReport({ ...report, stepsToReproduce: e.target.value.split('\n') })}
+                onChange={(e) => setReport(prev => ({ ...prev, stepsToReproduce: e.target.value.split('\n'), isCustom: true }))}
                 placeholder="1. Add item&#10;2. Click checkout&#10;3. Authorize card"
               />
             </div>
@@ -486,7 +555,7 @@ export function BugInputPanel({
               <input
                 type="text"
                 value={report.actualResult || ""}
-                onChange={(e) => setReport({ ...report, actualResult: e.target.value })}
+                onChange={(e) => setReport(prev => ({ ...prev, actualResult: e.target.value, isCustom: true }))}
                 placeholder="e.g. HTTP 500 error modal and order marked unpaid"
               />
             </div>
@@ -495,7 +564,7 @@ export function BugInputPanel({
               <input
                 type="text"
                 value={report.expectedResult || ""}
-                onChange={(e) => setReport({ ...report, expectedResult: e.target.value })}
+                onChange={(e) => setReport(prev => ({ ...prev, expectedResult: e.target.value, isCustom: true }))}
                 placeholder="e.g. Payment completes and order confirmation is displayed"
               />
             </div>

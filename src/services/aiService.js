@@ -120,6 +120,15 @@ function dynamicHeuristicAnalysis(objective, logs = "") {
     "TelemetryPublisher"
   ];
 
+  const nowIso = new Date().toISOString();
+  const syntheticLogs = `[${nowIso}] ERROR [${detectedComponent}] Execution failure in ${detectedModule}
+${detectedComponent}.${detectedModule}Exception: Failure during execution of: ${objective.trim()}
+    at com.company.${detectedComponent.replace(/-/g, '.')}.${detectedModule}.processRequest(${detectedModule}.java:84)
+    at com.company.gateway.ClientRequestDispatcher.dispatch(ClientRequestDispatcher.java:112)
+    at com.company.filter.SecurityContextFilter.doFilter(SecurityContextFilter.java:54)
+    at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:1072)
+[TraceID: trace-${Math.random().toString(36).substring(2, 10)}] ${severity.startsWith('P0') ? 'CRITICAL_BLOCKER' : 'ERROR_DEGRADATION'}: Service returned HTTP ${severity.startsWith('P0') ? '500' : '400'}`;
+
   return {
     objective: objective.trim(),
     title: `[Defect] ${objective.charAt(0).toUpperCase() + objective.slice(1)}`,
@@ -134,7 +143,9 @@ function dynamicHeuristicAnalysis(objective, logs = "") {
     severity,
     criticalOutageLevel,
     impactedSprint: "Sprint 42 (Current Active)",
-    impactedModules
+    impactedModules,
+    logs: syntheticLogs,
+    isCustom: true
   };
 }
 
@@ -209,7 +220,7 @@ Respond ONLY with the JSON object. Do not add markdown backticks.`;
           }
         }
       } catch (err) {
-        console.warn(`[AI Service] Ollama endpoint ${ep} call failed or timed out:`, err);
+        console.warn(`[AI Service] Ollama endpoint ${ep} unavailable, falling back to dynamic inference.`);
       }
     }
   }
@@ -286,6 +297,14 @@ Visual evidence demonstrates unexpected user-facing disruption. The interface di
   const actualResult = `Visual anomaly rendered on screen as captured in attached ${mediaTypeLabel.toLowerCase()} (${fileName}): Workflow is halted or displays error alert.`;
   const expectedResult = `Operation completes smoothly with proper success feedback and no UI error dialogs.`;
 
+  const nowIso = new Date().toISOString();
+  const syntheticLogs = `[${nowIso}] ERROR [${inferredModule}] UI exception rendered on client viewport
+${inferredComponent}.ClientException: Visual defect and rendering failure in ${fileName}
+    at com.company.${inferredComponent.replace(/-/g, '.')}.${inferredModule}.renderView(${inferredModule}.js:94)
+    at com.company.client.ViewDispatcher.dispatch(ViewDispatcher.js:52)
+    at com.company.client.AppRouter.handleTransition(AppRouter.js:118)
+[TraceID: trace-${Math.random().toString(36).substring(2, 10)}] ${severity.startsWith('P0') ? 'CRITICAL_OUTAGE' : 'UI_DEGRADATION'}: Visual error captured from ${fileName}`;
+
   return {
     objective: extractedObjective,
     title: extractedTitle,
@@ -301,6 +320,8 @@ Visual evidence demonstrates unexpected user-facing disruption. The interface di
     criticalOutageLevel,
     impactedSprint: "Sprint 42 (Q3-Core)",
     impactedModules: [inferredModule, `${inferredComponent}-ui`, "ClientRenderer", "StateCoordinator"],
+    logs: syntheticLogs,
+    isCustom: true,
     visualEvidence: {
       fileName,
       fileSizeKB,
@@ -374,7 +395,7 @@ Respond ONLY with the JSON object.`;
           }
         }
       } catch (err) {
-        console.warn(`[AI Service] Ollama analysis endpoint ${ep} failed:`, err);
+        console.warn(`[AI Service] Ollama endpoint ${ep} unavailable, falling back to dynamic inference.`);
       }
     }
   }
@@ -389,13 +410,28 @@ Respond ONLY with the JSON object.`;
   let recommendedFix = `Add defensive input validation and fallback default handling in ${report.moduleName || 'ServiceHandler'}.`;
   let solutionCode = `if (payload == null || !payload.isValid()) { return FallbackService.getDefaultResponse(); }`;
 
-  if (combinedText.includes("nullpointer") || combinedText.includes("undefined") || combinedText.includes("cannot read properties")) {
-    summary = `Unchecked null or undefined reference during data access in ${report.moduleName || 'Service'}`;
-    technicalDetails = `The application attempted to invoke a method or property on a null/undefined object without defensive guard checks. When guest or unexpected payloads are supplied, this triggers a runtime crash.`;
-    suspectFile = `${report.moduleName || 'TaxCalculator'}.java`;
-    suspectLine = 78;
-    recommendedFix = `Wrap order.getCustomerMetadata() in null-safety check with default billing country code fallback.`;
-    solutionCode = `Optional.ofNullable(order.getCustomerMetadata()).map(CustomerMetadata::getBillingCountryCode).orElse("US");`;
+  if (report.attachment) {
+    const mediaName = report.attachment.name || 'media';
+    const isVid = report.attachment.isVideo;
+    summary = `Visual rendering defect verified in ${isVid ? 'screen recording' : 'screenshot'} "${mediaName}"`;
+    technicalDetails = `Inspection of ${isVid ? 'video' : 'screenshot'} indicates an unhandled error alert or UI exception in ${report.moduleName || report.component || 'UI'}. The visual failure prevents the user from successfully proceeding through the workflow.`;
+    suspectFile = `${report.moduleName || 'ViewRenderer'}.jsx`;
+    suspectLine = 64;
+    recommendedFix = `Add visual boundary checks and error boundary recovery in ${suspectFile}.`;
+    solutionCode = `<ErrorBoundary fallback={<InlineAlert message="Workflow unavailable, retrying..." />}>\n  <${report.moduleName || 'Component'} />\n</ErrorBoundary>`;
+  } else if (combinedText.includes("nullpointer") || combinedText.includes("undefined") || combinedText.includes("cannot read properties")) {
+    const isPayment = (report.title || "").toLowerCase().includes("payment") || (report.component || "").toLowerCase().includes("payment");
+    const mod = report.moduleName || (isPayment ? "TaxCalculator" : "ServiceHandler");
+    summary = `Unchecked null reference during data access in ${mod}`;
+    technicalDetails = `The application attempted to invoke a method or property on a null or uninitialized object without defensive guard checks in ${mod}.`;
+    suspectFile = `${mod}.java`;
+    suspectLine = isPayment ? 78 : 54;
+    recommendedFix = isPayment 
+      ? `Wrap order.getCustomerMetadata() in defensive null-check with default fallback country code.`
+      : `Add defensive null check or Optional wrapper around data access in ${mod}.`;
+    solutionCode = isPayment
+      ? `Optional.ofNullable(order.getCustomerMetadata()).map(CustomerMetadata::getBillingCountryCode).orElse("US");`
+      : `if (payload != null && payload.isValid()) {\n    return processValidatedData(payload);\n} else {\n    logger.warn("Null or invalid payload encountered in ${mod}");\n    return FallbackResponse.defaultHandler();\n}`;
   } else if (combinedText.includes("401") || combinedText.includes("jwt") || combinedText.includes("token") || combinedText.includes("auth")) {
     summary = `Authentication token validation rejected during session verification`;
     technicalDetails = `Security verification filter rejected bearer token. Token claims or clock skew leeway between distributed nodes caused premature authorization failure.`;
