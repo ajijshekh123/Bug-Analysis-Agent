@@ -20,14 +20,16 @@
   - **Jira MCP**: Queries historical bug databases, retrieves past incident resolutions, and links related issues.
   - **GitHub MCP**: Scans recent commits and pull requests, correlates suspect files from the stack trace, and displays suspect code blame and unified git diffs.
   - **Stretch Goal — Duplicate Bug Detection**: Uses semantic text similarity and token overlap to discover duplicate tickets in Jira with match percentages and provides a 1-click **"Link as Duplicate"** workflow.
+  - 📖 **[Detailed MCP Integration Guide](docs/MCP_INTEGRATION_GUIDE.md)**: Step-by-step instructions on setting up Jira & GitHub MCP servers.
 
-- **📊 Comprehensive Output Dashboard**:
-  - **Severity & Impact Card**: Visual badge with glow, SLA countdown timer, and rubric decision breakdown.
-  - **Likely Root Cause Diagnosis**: Plain-English explanation, deep technical details, culprit commit SHA, and syntax-highlighted regression diff.
-  - **Sequential Remediation Playbook**: Categorized into *Immediate Mitigation*, *Permanent Code Fix*, *Reproduction & Unit Testing*, and *Observability & Alerting* with copyable commands.
+- **📊 User-Friendly Output Dashboard (Designed for Everyone)**:
+  - **Severity & Impact Card**: Plain-English urgency rating (e.g., *Fix within 1 hour - Real users blocked*), confidence meter, and financial risk assessment.
+  - **Likely Root Cause Diagnosis**: Jargon-free explanation of what broke and why, with an optional toggle to inspect technical code lines and Git diffs.
+  - **Sequential Remediation Playbook**: Actionable checklist with interactive checkboxes so team members can tick off steps as they complete them.
   - **Evidence Inspector Tabs**: Multi-tab drawer to explore raw GitHub commits, historical Jira issues, and level-filtered log events (`ALL`, `ERROR`, `WARN`).
 
-- **⚙️ Full Configuration UI**:
+- **⚙️ Full Configuration UI & In-App Guide**:
+  - In-app **"How to Integrate MCP Tools"** interactive tutorial.
   - Configurable Jira MCP credentials (Host URL, Project Key, Token) with live API or enterprise mock database toggle.
   - Configurable GitHub MCP credentials (Repository, Branch, Personal Access Token).
   - Customizable Triage Rubric SLA hours, escalation keywords, and log-parsing app code prefixes.

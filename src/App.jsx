@@ -4,6 +4,7 @@ import { BugInputPanel } from './components/BugInputPanel';
 import { TriageResultPanel } from './components/TriageResultPanel';
 import { EvidenceTabs } from './components/EvidenceTabs';
 import { ConfigModal } from './components/ConfigModal';
+import { McpIntegrationGuideModal } from './components/McpIntegrationGuideModal';
 import { MOCK_SCENARIOS } from './data/mockScenarios';
 import { DEFAULT_RUBRIC_CONFIG } from './skills/triageRubric';
 import { runBugAnalysisAgent } from './services/agentEngine';
@@ -17,6 +18,7 @@ export default function App() {
   const [analysis, setAnalysis] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [isMcpGuideOpen, setIsMcpGuideOpen] = useState(false);
   const [linkedBugs, setLinkedBugs] = useState({});
 
   const [mcpConfig, setMcpConfig] = useState({
@@ -81,6 +83,7 @@ export default function App() {
       {/* 1. Header Navigation */}
       <Navbar 
         onOpenConfig={() => setIsConfigOpen(true)}
+        onOpenMcpGuide={() => setIsMcpGuideOpen(true)}
         mcpConfig={mcpConfig}
         isAnalyzing={isAnalyzing}
       />
@@ -88,8 +91,8 @@ export default function App() {
       {/* 2. Quick Scenario Presets Toolbar */}
       <div className="scenarios-toolbar">
         <div className="scenarios-label" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-          <Zap size={14} style={{ color: '#f59e0b' }} />
-          <span>Quick Scenarios:</span>
+          <Sparkles size={14} style={{ color: '#818cf8' }} />
+          <span>💡 Try an Example Incident:</span>
         </div>
         <div className="scenario-chips-wrapper">
           {MOCK_SCENARIOS.map((scenario) => (
@@ -141,6 +144,12 @@ export default function App() {
         setMcpConfig={setMcpConfig}
         rubricConfig={rubricConfig}
         setRubricConfig={setRubricConfig}
+      />
+
+      {/* 6. Step-by-Step MCP Integration Guide Modal */}
+      <McpIntegrationGuideModal
+        isOpen={isMcpGuideOpen}
+        onClose={() => setIsMcpGuideOpen(false)}
       />
     </div>
   );

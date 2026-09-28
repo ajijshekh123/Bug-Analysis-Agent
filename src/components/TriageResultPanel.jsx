@@ -8,11 +8,14 @@ import {
   Copy, 
   Check, 
   Link2, 
-  Code2, 
-  Terminal, 
+  ChevronDown, 
+  ChevronUp, 
+  CheckSquare, 
+  Square,
+  HelpCircle,
+  Sparkles,
   Flame,
-  ExternalLink,
-  Sparkles
+  ArrowRight
 } from 'lucide-react';
 
 export function TriageResultPanel({
@@ -21,35 +24,39 @@ export function TriageResultPanel({
   linkedBugs = {}
 }) {
   const [copiedId, setCopiedId] = useState(null);
+  const [showTechnicalDiff, setShowTechnicalDiff] = useState(false);
+  const [completedSteps, setCompletedSteps] = useState({});
 
   if (!analysis) {
     return (
-      <div className="glass-panel" style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '400px' }}>
-        <div style={{ textAlign: 'center', padding: '2rem', maxWidth: '380px' }}>
+      <div className="glass-panel" style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '420px' }}>
+        <div style={{ textAlign: 'center', padding: '2rem', maxWidth: '400px' }}>
           <div style={{ 
-            width: '54px', 
-            height: '54px', 
+            width: '58px', 
+            height: '58px', 
             borderRadius: '50%', 
-            background: 'rgba(99, 102, 241, 0.1)', 
+            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(139, 92, 246, 0.2))', 
             display: 'flex', 
             alignItems: 'center', 
             justifyContent: 'center', 
             margin: '0 auto 1.25rem',
-            border: '1px solid rgba(99, 102, 241, 0.25)' 
+            border: '1px solid rgba(99, 102, 241, 0.3)' 
           }}>
-            <Sparkles size={26} style={{ color: '#818cf8' }} />
+            <Sparkles size={28} style={{ color: '#a5b4fc' }} />
           </div>
-          <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '0.5rem' }}>Agent Standing By</h3>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-            Provide a bug report and application logs on the left, then click <strong>Run Autonomous Bug Analysis</strong>.
-            The agent will apply the Triage Rubric, parse the logs, query GitHub & Jira, and identify the root cause.
+          <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '0.5rem', color: '#f3f4f6' }}>
+            Ready to Triage
+          </h3>
+          <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+            Enter your bug report and logs on the left (or pick an example above), then click 
+            <strong style={{ color: '#c7d2fe' }}> "Analyze Bug & Get Solution"</strong>.
           </p>
         </div>
       </div>
     );
   }
 
-  const { triageEvaluation, likelyRootCause, nextSteps, duplicateCandidates, githubEvidence } = analysis;
+  const { triageEvaluation, likelyRootCause, nextSteps, duplicateCandidates } = analysis;
 
   const handleCopy = (text, id) => {
     navigator.clipboard.writeText(text);
@@ -57,176 +64,207 @@ export function TriageResultPanel({
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const toggleStepDone = (id) => {
+    setCompletedSteps(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
+
+  // Friendly severity badge labels
+  const severityDisplayMap = {
+    P0: { label: "Critical Outage (P0)", color: "p0", icon: "🚨", time: "Fix within 1 hour", desc: "Core functionality is completely blocked. Immediate action needed!" },
+    P1: { label: "High Priority (P1)", color: "p1", icon: "⚠️", time: "Fix within 4 hours", desc: "Major feature broken for a large group of users." },
+    P2: { label: "Medium Priority (P2)", color: "p2", icon: "⚡", time: "Fix within 24 hours", desc: "System performance is degraded or a secondary feature is failing." },
+    P3: { label: "Low Priority (P3)", color: "p3", icon: "🎨", time: "Fix within 72 hours", desc: "Minor visual glitch or cosmetic issue with no data loss." }
+  };
+
+  const sevInfo = severityDisplayMap[triageEvaluation.severity] || severityDisplayMap.P2;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      {/* 1. SEVERITY & TRIAGE RUBRIC CARD */}
-      <div className={`glass-panel triage-highlight-card ${triageEvaluation.badgeColor}`}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+      {/* 1. SEVERITY & IMPACT CARD (EASY FOR NORMAL USERS) */}
+      <div className={`glass-panel triage-highlight-card ${sevInfo.color}`}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.4rem' }}>
-              <span className={`severity-badge ${triageEvaluation.badgeColor}`}>
-                <ShieldAlert size={14} />
-                {triageEvaluation.severityLabel}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.35rem' }}>
+              <span className={`severity-badge ${sevInfo.color}`} style={{ fontSize: '0.9rem', padding: '0.4rem 0.95rem' }}>
+                <span style={{ fontSize: '1rem' }}>{sevInfo.icon}</span>
+                <span>{sevInfo.label}</span>
               </span>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Evaluated by <strong>Triage Rubric Skill</strong>
+              <span style={{ fontSize: '0.8rem', color: '#c7d2fe', fontWeight: 600 }}>
+                {triageEvaluation.confidenceScore}% Confidence
               </span>
             </div>
-            <p style={{ fontSize: '0.9rem', color: '#e5e7eb', fontWeight: 500 }}>
-              Priority: <strong style={{ color: '#fff' }}>{triageEvaluation.priority}</strong>
+            <p style={{ fontSize: '0.92rem', color: '#e5e7eb', marginTop: '0.3rem' }}>
+              {sevInfo.desc}
             </p>
           </div>
 
-          <div className="meta-box" style={{ minWidth: '150px' }}>
-            <div className="meta-box-label">SLA Target Resolution</div>
-            <div className="meta-box-val" style={{ color: triageEvaluation.severity === 'P0' ? '#ef4444' : '#f59e0b' }}>
-              <Clock size={16} />
-              <span>&lt; {triageEvaluation.slaHours} {triageEvaluation.slaHours === 1 ? 'Hour' : 'Hours'}</span>
+          <div className="meta-box" style={{ minWidth: '160px', background: 'rgba(0,0,0,0.5)' }}>
+            <div className="meta-box-label">Target Resolution Time</div>
+            <div className="meta-box-val" style={{ color: triageEvaluation.severity === 'P0' ? '#ef4444' : '#f59e0b', fontSize: '1.05rem' }}>
+              <Clock size={17} />
+              <span>{sevInfo.time}</span>
             </div>
           </div>
         </div>
 
-        {/* Meta Stats Grid */}
-        <div className="triage-meta-grid">
-          <div className="meta-box">
-            <div className="meta-box-label">Confidence</div>
-            <div className="meta-box-val">{triageEvaluation.confidenceScore}%</div>
+        {/* Plain English Summary Chips */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
+          <div style={{ fontSize: '0.78rem', background: 'rgba(0,0,0,0.3)', padding: '0.35rem 0.75rem', borderRadius: '14px', border: '1px solid var(--border-subtle)' }}>
+            <span style={{ color: 'var(--text-dim)' }}>Scope: </span>
+            <strong style={{ color: '#fff' }}>{triageEvaluation.rubricBreakdown.blastRadius}</strong>
           </div>
-          <div className="meta-box">
-            <div className="meta-box-label">Blast Radius</div>
-            <div className="meta-box-val">{triageEvaluation.rubricBreakdown.blastRadius}</div>
+
+          <div style={{ fontSize: '0.78rem', background: 'rgba(0,0,0,0.3)', padding: '0.35rem 0.75rem', borderRadius: '14px', border: '1px solid var(--border-subtle)' }}>
+            <span style={{ color: 'var(--text-dim)' }}>Revenue / Financial Risk: </span>
+            <strong style={{ color: triageEvaluation.rubricBreakdown.revenueImpact ? '#ef4444' : '#10b981' }}>
+              {triageEvaluation.rubricBreakdown.revenueImpact ? 'Yes (Loss Detected)' : 'No'}
+            </strong>
           </div>
-          <div className="meta-box">
-            <div className="meta-box-label">Financial Risk</div>
-            <div className="meta-box-val" style={{ color: triageEvaluation.rubricBreakdown.revenueImpact ? '#ef4444' : '#10b981' }}>
-              {triageEvaluation.rubricBreakdown.revenueImpact ? 'Critical' : 'Nominal'}
-            </div>
-          </div>
-          <div className="meta-box">
-            <div className="meta-box-label">Workaround</div>
-            <div className="meta-box-val" style={{ color: triageEvaluation.rubricBreakdown.workaroundAvailable ? '#10b981' : '#ef4444' }}>
-              {triageEvaluation.rubricBreakdown.workaroundAvailable ? 'Available' : 'None'}
-            </div>
+
+          <div style={{ fontSize: '0.78rem', background: 'rgba(0,0,0,0.3)', padding: '0.35rem 0.75rem', borderRadius: '14px', border: '1px solid var(--border-subtle)' }}>
+            <span style={{ color: 'var(--text-dim)' }}>Workaround: </span>
+            <strong style={{ color: triageEvaluation.rubricBreakdown.workaroundAvailable ? '#10b981' : '#ef4444' }}>
+              {triageEvaluation.rubricBreakdown.workaroundAvailable ? 'Temporary fix available' : 'None available'}
+            </strong>
           </div>
         </div>
-
-        {/* Rubric Breakdown List */}
-        {triageEvaluation.rubricBreakdown.matchedFactors.length > 0 && (
-          <div style={{ marginTop: '0.25rem' }}>
-            <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-dim)', fontWeight: 700, marginBottom: '0.4rem' }}>
-              Rubric Decision Signals
-            </div>
-            <div className="rubric-factors-list">
-              {triageEvaluation.rubricBreakdown.matchedFactors.map((factor, idx) => (
-                <div key={idx} className="rubric-factor-item active">
-                  <CheckCircle size={13} style={{ color: '#10b981', flexShrink: 0 }} />
-                  <span>{factor}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* 2. LIKELY ROOT CAUSE CARD */}
+      {/* 2. LIKELY ROOT CAUSE (PLAIN ENGLISH + OPTIONAL TECH DETAILS) */}
       <div className="glass-panel">
         <div className="panel-header">
           <div className="panel-title-wrapper">
-            <Flame size={18} style={{ color: '#ef4444' }} />
-            <h3 className="panel-title">Likely Root Cause Diagnosis</h3>
+            <div style={{ 
+              width: '28px', 
+              height: '28px', 
+              borderRadius: '6px', 
+              background: 'rgba(239, 68, 68, 0.15)',
+              color: '#ef4444',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 700,
+              fontSize: '0.85rem'
+            }}>
+              2
+            </div>
+            <div>
+              <h3 className="panel-title" style={{ fontSize: '1.02rem', fontWeight: 700 }}>
+                Likely Root Cause (Why Did This Happen?)
+              </h3>
+              <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                Identified by correlating server logs with recent code deployments
+              </p>
+            </div>
           </div>
-          {likelyRootCause.suspectFile && (
-            <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: '#818cf8', background: 'rgba(99, 102, 241, 0.12)', padding: '2px 8px', borderRadius: '6px' }}>
-              {likelyRootCause.suspectFile}:{likelyRootCause.suspectLine}
-            </span>
-          )}
         </div>
 
         <div className="panel-body">
-          <div style={{ fontSize: '0.98rem', fontWeight: 600, color: '#f9fafb' }}>
-            {likelyRootCause.summary}
+          {/* Friendly Summary Box */}
+          <div style={{ 
+            background: 'rgba(99, 102, 241, 0.08)', 
+            border: '1px solid rgba(99, 102, 241, 0.25)', 
+            borderRadius: 'var(--radius-md)', 
+            padding: '1rem' 
+          }}>
+            <div style={{ fontSize: '0.98rem', fontWeight: 700, color: '#e0e7ff', marginBottom: '0.35rem' }}>
+              {likelyRootCause.summary}
+            </div>
+            <p style={{ fontSize: '0.86rem', color: '#c7d2fe', lineHeight: 1.6 }}>
+              {likelyRootCause.technicalDetails}
+            </p>
           </div>
 
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
-            {likelyRootCause.technicalDetails}
-          </p>
-
-          {/* Culprit commit alert if matched by GitHub MCP */}
+          {/* Culprit Commit Badge */}
           {likelyRootCause.suspectCommit && (
             <div className="culprit-commit-banner">
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 <GitCommit size={16} style={{ color: '#818cf8' }} />
                 <div>
-                  <div style={{ fontWeight: 600, color: '#e0e7ff' }}>
-                    Culprit Commit: {likelyRootCause.suspectCommit.sha} (PR #{likelyRootCause.suspectCommit.prNumber})
+                  <div style={{ fontWeight: 600, color: '#e0e7ff', fontSize: '0.82rem' }}>
+                    Triggered by recent change: Commit <code>{likelyRootCause.suspectCommit.sha}</code> (PR #{likelyRootCause.suspectCommit.prNumber})
                   </div>
                   <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                    by {likelyRootCause.suspectCommit.author} • {likelyRootCause.suspectCommit.message}
+                    Author: {likelyRootCause.suspectCommit.author}
                   </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Unified Diff Snippet */}
+          {/* Toggle for Technical Code Diff */}
           {likelyRootCause.diffSnippet && (
-            <div className="diff-container">
-              <div className="diff-header">
-                <span>Suspect Regression Diff ({likelyRootCause.suspectFile || 'code'})</span>
-                <span>GitHub MCP blame match</span>
-              </div>
-              <div style={{ padding: '0.5rem 0' }}>
-                {likelyRootCause.diffSnippet.split('\n').map((line, idx) => {
-                  let lineClass = "diff-line";
-                  if (line.startsWith('+') && !line.startsWith('+++')) lineClass += " add";
-                  else if (line.startsWith('-') && !line.startsWith('---')) lineClass += " del";
-                  else if (line.startsWith('@@') || line.startsWith('diff')) lineClass += " meta";
-                  return (
-                    <div key={idx} className={lineClass}>
-                      {line}
-                    </div>
-                  );
-                })}
-              </div>
+            <div>
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ padding: '0.35rem 0.75rem', fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                onClick={() => setShowTechnicalDiff(!showTechnicalDiff)}
+              >
+                <span>{showTechnicalDiff ? 'Hide Code Diff' : '🔍 View Problematic Code Line & Diff'}</span>
+                {showTechnicalDiff ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </button>
+
+              {showTechnicalDiff && (
+                <div className="diff-container" style={{ marginTop: '0.75rem' }}>
+                  <div className="diff-header">
+                    <span>File: {likelyRootCause.suspectFile || 'code'}</span>
+                    <span>Highlighted Code Change</span>
+                  </div>
+                  <div style={{ padding: '0.5rem 0' }}>
+                    {likelyRootCause.diffSnippet.split('\n').map((line, idx) => {
+                      let lineClass = "diff-line";
+                      if (line.startsWith('+') && !line.startsWith('+++')) lineClass += " add";
+                      else if (line.startsWith('-') && !line.startsWith('---')) lineClass += " del";
+                      else if (line.startsWith('@@') || line.startsWith('diff')) lineClass += " meta";
+                      return (
+                        <div key={idx} className={lineClass}>
+                          {line}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
       </div>
 
-      {/* 3. STRETCH GOAL: DUPLICATE BUGS & LINKING */}
+      {/* 3. SIMILAR / DUPLICATE BUG FOUND (STRETCH GOAL) */}
       {duplicateCandidates && duplicateCandidates.length > 0 && (
         <div className="duplicates-banner">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Link2 size={18} style={{ color: '#f59e0b' }} />
               <div>
-                <h4 style={{ fontSize: '0.92rem', fontWeight: 700, color: '#fef3c7' }}>
-                  Stretch Goal: Duplicate Bug Candidates Detected in Jira
+                <h4 style={{ fontSize: '0.94rem', fontWeight: 700, color: '#fef3c7' }}>
+                  🤝 Similar Past Bug Found in Jira!
                 </h4>
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  Evaluated similarity across historical Jira tickets for related resolutions
+                <p style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                  A similar issue was solved before. You can link it or reuse the solution!
                 </p>
               </div>
             </div>
-            <span style={{ fontSize: '0.72rem', background: 'rgba(245, 158, 11, 0.2)', color: '#fcd34d', padding: '3px 9px', borderRadius: '12px', fontWeight: 600 }}>
-              {duplicateCandidates.length} Found
+            <span style={{ fontSize: '0.72rem', background: 'rgba(245, 158, 11, 0.2)', color: '#fcd34d', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>
+              {duplicateCandidates[0].similarityScore}% Match
             </span>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-            {duplicateCandidates.map((dup) => {
+            {duplicateCandidates.slice(0, 2).map((dup) => {
               const isLinked = linkedBugs[dup.key];
               return (
                 <div key={dup.key} className="duplicate-item">
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div>
                       <span style={{ fontWeight: 700, color: '#60a5fa', fontSize: '0.85rem' }}>
                         {dup.key}
                       </span>
-                      <span style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: '8px', background: 'rgba(255,255,255,0.06)', color: 'var(--text-dim)' }}>
-                        {dup.status}
-                      </span>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 500, color: '#f3f4f6' }}>
+                      <span style={{ marginLeft: '0.5rem', fontSize: '0.82rem', color: '#f3f4f6' }}>
                         {dup.summary}
                       </span>
                     </div>
@@ -246,7 +284,7 @@ export function TriageResultPanel({
                       {isLinked ? (
                         <>
                           <Check size={13} />
-                          <span>Linked in Jira</span>
+                          <span>Linked in Jira ✅</span>
                         </>
                       ) : (
                         <>
@@ -257,19 +295,9 @@ export function TriageResultPanel({
                     </button>
                   </div>
 
-                  {/* Similarity meter */}
-                  <div className="similarity-bar-wrapper">
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', minWidth: '85px' }}>
-                      Similarity: <strong style={{ color: dup.similarityScore > 75 ? '#ef4444' : '#f59e0b' }}>{dup.similarityScore}%</strong>
-                    </span>
-                    <div className="similarity-bar">
-                      <div className="similarity-bar-fill" style={{ width: `${dup.similarityScore}%` }} />
-                    </div>
-                  </div>
-
                   {dup.solution && (
-                    <div style={{ fontSize: '0.75rem', color: '#a7f3d0', background: 'rgba(16, 185, 129, 0.08)', padding: '0.4rem 0.6rem', borderRadius: '4px' }}>
-                      <strong>Known Resolution:</strong> {dup.solution}
+                    <div style={{ fontSize: '0.78rem', color: '#a7f3d0', background: 'rgba(16, 185, 129, 0.08)', padding: '0.45rem 0.65rem', borderRadius: '4px' }}>
+                      <strong>Previous Fix Used:</strong> {dup.solution}
                     </div>
                   )}
                 </div>
@@ -279,63 +307,87 @@ export function TriageResultPanel({
         </div>
       )}
 
-      {/* 4. ACTIONABLE NEXT STEPS CARD */}
+      {/* 4. RECOMMENDED NEXT STEPS (ACTIONABLE CHECKLIST) */}
       <div className="glass-panel">
         <div className="panel-header">
           <div className="panel-title-wrapper">
-            <CheckCircle size={18} style={{ color: '#10b981' }} />
-            <h3 className="panel-title">Actionable Next Steps & Remediation</h3>
+            <div style={{ 
+              width: '28px', 
+              height: '28px', 
+              borderRadius: '6px', 
+              background: 'rgba(16, 185, 129, 0.15)',
+              color: '#10b981',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 700,
+              fontSize: '0.85rem'
+            }}>
+              3
+            </div>
+            <div>
+              <h3 className="panel-title" style={{ fontSize: '1.02rem', fontWeight: 700 }}>
+                Next Steps (Action Plan to Fix)
+              </h3>
+              <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                Follow this sequential checklist to mitigate and permanently resolve the bug
+              </p>
+            </div>
           </div>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            Sequential Playbook
-          </span>
         </div>
 
         <div className="panel-body">
           <div className="next-steps-list">
-            {nextSteps.map((step, idx) => (
-              <div key={step.id} className="step-card">
-                <div className="step-header">
-                  <div className="step-title">
-                    <span style={{ 
-                      width: '20px', 
-                      height: '20px', 
-                      borderRadius: '50%', 
-                      background: 'rgba(99, 102, 241, 0.2)', 
-                      color: '#a5b4fc', 
-                      fontSize: '0.72rem', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center',
-                      fontWeight: 700
-                    }}>
-                      {idx + 1}
-                    </span>
-                    <span>{step.title}</span>
-                  </div>
-                  <span className="step-category-pill">{step.category}</span>
-                </div>
-
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', paddingLeft: '1.75rem' }}>
-                  {step.detail}
-                </p>
-
-                {step.command && (
-                  <div style={{ paddingLeft: '1.75rem' }}>
-                    <div className="step-command-box">
-                      <code>{step.command}</code>
-                      <button
-                        className="btn-icon-copy"
-                        onClick={() => handleCopy(step.command, step.id)}
-                        title="Copy command to clipboard"
-                      >
-                        {copiedId === step.id ? <Check size={14} style={{ color: '#10b981' }} /> : <Copy size={14} />}
-                      </button>
+            {nextSteps.map((step, idx) => {
+              const isDone = Boolean(completedSteps[step.id]);
+              return (
+                <div 
+                  key={step.id} 
+                  className="step-card"
+                  style={{ 
+                    opacity: isDone ? 0.65 : 1,
+                    borderLeft: isDone ? '3px solid #10b981' : '3px solid #6366f1'
+                  }}
+                >
+                  <div className="step-header">
+                    <div 
+                      className="step-title" 
+                      style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.6rem' }}
+                      onClick={() => toggleStepDone(step.id)}
+                    >
+                      {isDone ? (
+                        <CheckSquare size={18} style={{ color: '#10b981' }} />
+                      ) : (
+                        <Square size={18} style={{ color: 'var(--text-dim)' }} />
+                      )}
+                      <span style={{ textDecoration: isDone ? 'line-through' : 'none' }}>
+                        {step.title}
+                      </span>
                     </div>
+                    <span className="step-category-pill">{step.category}</span>
                   </div>
-                )}
-              </div>
-            ))}
+
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', paddingLeft: '1.75rem' }}>
+                    {step.detail}
+                  </p>
+
+                  {step.command && (
+                    <div style={{ paddingLeft: '1.75rem' }}>
+                      <div className="step-command-box">
+                        <code style={{ fontSize: '0.78rem' }}>{step.command}</code>
+                        <button
+                          className="btn-icon-copy"
+                          onClick={() => handleCopy(step.command, step.id)}
+                          title="Copy command to clipboard"
+                        >
+                          {copiedId === step.id ? <Check size={14} style={{ color: '#10b981' }} /> : <Copy size={14} />}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

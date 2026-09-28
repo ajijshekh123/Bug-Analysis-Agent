@@ -1,11 +1,11 @@
 export const MOCK_SCENARIOS = [
   {
     id: "payment-npe",
-    name: "🚨 P0: Payment Gateway NullPointerException on Checkout",
-    badge: "P0 Blocker",
+    name: "💳 Example 1: Checkout Error (Critical P0)",
+    badge: "P0 Critical",
     badgeColor: "p0",
     report: {
-      title: "Checkout fails with HTTP 500 when processing Stripe 3D-Secure payments",
+      title: "Checkout fails with HTTP 500 when processing Stripe payments",
       component: "payment-gateway-service",
       environment: "Production (us-east-1)",
       version: "v2.14.0",
@@ -28,7 +28,7 @@ java.lang.NullPointerException: Cannot invoke "com.company.payment.model.Custome
   },
   {
     id: "auth-loop-duplicate",
-    name: "⚠️ P1: Auth Service 401 Loop with Clock Skew (Potential Duplicate)",
+    name: "🔐 Example 2: Login Loop (High P1 - Duplicate Found)",
     badge: "P1 High",
     badgeColor: "p1",
     report: {
@@ -53,7 +53,7 @@ com.auth0.jwt.exceptions.InvalidClaimException: The Token can't be used before M
   },
   {
     id: "redis-cache-exhaustion",
-    name: "⚡ P2: Redis Connection Pool Exhaustion on Product Catalog",
+    name: "🐢 Example 3: Slow Page Loading (Medium P2)",
     badge: "P2 Medium",
     badgeColor: "p2",
     report: {
@@ -79,7 +79,7 @@ Caused by: java.util.NoSuchElementException: Timeout waiting for idle object in 
   },
   {
     id: "ui-theme-flicker",
-    name: "🎨 P3: Dark Mode Theme Toggle Flicker on Page Reload",
+    name: "🌓 Example 4: Theme Flicker (Low P3)",
     badge: "P3 Low",
     badgeColor: "p3",
     report: {
