@@ -60,14 +60,14 @@ export function TriageResultPanel({
   }
 
   const { 
-    triageEvaluation, 
-    likelyRootCause, 
-    nextSteps, 
-    impactedModules, 
-    criticalOutageLevel, 
-    logAnalysis, 
-    duplicateCandidates 
-  } = analysis;
+    triageEvaluation = {}, 
+    likelyRootCause = {}, 
+    nextSteps = [], 
+    impactedModules = [], 
+    criticalOutageLevel = "CRITICAL OUTAGE EVALUATED", 
+    logAnalysis = {}, 
+    duplicateCandidates = [] 
+  } = analysis || {};
 
   const handleCopy = (text, id) => {
     navigator.clipboard.writeText(text);
@@ -253,7 +253,7 @@ export function TriageResultPanel({
 
         <div className="panel-body">
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-            {impactedModules.map((mod, i) => (
+            {(impactedModules || []).map((mod, i) => (
               <span key={i} className="module-tag">
                 <Cpu size={12} />
                 <span>{mod}</span>
