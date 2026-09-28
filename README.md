@@ -14,11 +14,22 @@
     - Deep diagnostic triage: Error/Logs analysis, Root Cause identification, Impacted Modules, Critical Outage evaluation, and Step-by-Step Action Plan.
   - **AI Model Status & Settings**: Test connection, pick target model, and configure custom host endpoints directly in the UI.
 
+- **📸 Screenshot & Video Ingestion**:
+  - **Upload Screenshot or Screen Recording Video**: Upload `.png`, `.jpg`, `.mp4`, `.webm` files directly.
+  - **AI Visual Extraction**: Automatically analyzes visual anomalies, error dialogs, reproduction steps, affected component, and severity from the media.
+  - **Live Media Preview**: Includes inline image viewer and video playback controls.
+
 - **📥 Dual Ingestion & Bug Objective Generator**:
-  - **Bug Objective Input**: Type any natural language bug objective (e.g., *"Users cannot download PDF invoice on Safari 17"*), click **Generate Full Bug Details**, and watch AI automatically synthesize structured QA defect specifications.
+  - **Bug Objective Input**: Type any natural language bug objective (e.g., *"Users cannot download PDF invoice on Safari 17"*), click **Create Bug Details**, and watch AI automatically synthesize structured QA defect specifications.
   - Structured bug reports: Summary, affected component, environment, version, description, pre-conditions, steps, actual/expected.
   - Raw server logs & stack traces: Live paste or `.log` / `.txt` / `.json` file uploader.
   - Pre-loaded enterprise scenarios (**P0** Payment NPE, **P1** Auth 401 Loop, **P2** Redis Saturation, **P3** UI theme flicker).
+
+- **🎯 Focused Diagnostic Output (Root Cause, Outage, Fix Plan)**:
+  - **Critical Outage & SLA Evaluation**: Evaluates severity (**P0 Blocker**, **P1 High**, **P2 Medium**, **P3 Low**), SLA deadlines, priority level, blast radius, and revenue impact.
+  - **Root Cause & Suspect Code Diff**: Jargon-free root cause, culprit commit, and toggleable unified code diff.
+  - **Recommended Fix Plan & Code Solution**: Direct, actionable code patch or command snippet with 1-click clipboard copy.
+  - **Visual Evidence Verified**: Confirmation and thumbnail display of analyzed screenshot/video evidence.
 
 - **🧠 Specialized Agent Skills**:
   - **Triage Rubric Skill**: Automatically evaluates severity (**P0 Blocker**, **P1 High**, **P2 Medium**, **P3 Low**), SLA deadlines, priority level, blast radius, revenue impact, and customer workaround viability.

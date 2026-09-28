@@ -10,14 +10,14 @@ import {
   Link2, 
   ChevronDown, 
   ChevronUp, 
-  CheckSquare, 
-  Square,
-  Sparkles,
-  Flame,
-  Layers,
-  Terminal,
-  ExternalLink,
-  Cpu
+  Sparkles, 
+  Flame, 
+  Layers, 
+  Terminal, 
+  ExternalLink, 
+  Cpu,
+  Wrench,
+  Eye
 } from 'lucide-react';
 
 export function TriageResultPanel({
@@ -27,7 +27,6 @@ export function TriageResultPanel({
 }) {
   const [copiedId, setCopiedId] = useState(null);
   const [showTechnicalDiff, setShowTechnicalDiff] = useState(false);
-  const [completedSteps, setCompletedSteps] = useState({});
 
   if (!analysis) {
     return (
@@ -232,6 +231,83 @@ export function TriageResultPanel({
               )}
             </div>
           )}
+
+          {/* Recommended Fix Plan & Code Solution */}
+          {(likelyRootCause.recommendedFix || likelyRootCause.solutionCode) && (
+            <div style={{ 
+              marginTop: '0.85rem', 
+              background: 'rgba(16, 185, 129, 0.08)', 
+              border: '1px solid rgba(16, 185, 129, 0.28)', 
+              borderRadius: 'var(--radius-md)', 
+              padding: '0.9rem' 
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: '#34d399', fontWeight: 700, fontSize: '0.88rem' }}>
+                  <Wrench size={16} />
+                  <span>Recommended Fix Plan</span>
+                </div>
+                <span style={{ fontSize: '0.7rem', background: 'rgba(16, 185, 129, 0.2)', color: '#6ee7b7', padding: '2px 8px', borderRadius: '10px', fontWeight: 600 }}>
+                  Targeted Solution
+                </span>
+              </div>
+
+              {likelyRootCause.recommendedFix && (
+                <p style={{ fontSize: '0.84rem', color: 'var(--text-main)', margin: '0 0 0.5rem', lineHeight: 1.5 }}>
+                  {likelyRootCause.recommendedFix}
+                </p>
+              )}
+
+              {likelyRootCause.solutionCode && (
+                <div className="step-command-box" style={{ margin: 0 }}>
+                  <code style={{ fontSize: '0.78rem' }}>{likelyRootCause.solutionCode}</code>
+                  <button
+                    className="btn-icon-copy"
+                    onClick={() => handleCopy(likelyRootCause.solutionCode, 'fix-code')}
+                    title="Copy solution code"
+                  >
+                    {copiedId === 'fix-code' ? <Check size={14} style={{ color: '#10b981' }} /> : <Copy size={14} />}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Visual Bug Evidence Verified (from uploaded screenshot or video) */}
+          {likelyRootCause.visualEvidence && (
+            <div style={{ 
+              marginTop: '0.85rem',
+              background: 'rgba(99, 102, 241, 0.08)', 
+              border: '1px solid rgba(99, 102, 241, 0.25)', 
+              borderRadius: 'var(--radius-md)', 
+              padding: '0.85rem',
+              display: 'flex',
+              gap: '0.85rem',
+              alignItems: 'center'
+            }}>
+              {likelyRootCause.visualEvidence.dataUrl && (
+                <div style={{ width: '84px', height: '64px', borderRadius: '6px', overflow: 'hidden', flexShrink: 0, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {likelyRootCause.visualEvidence.type?.startsWith('video/') ? (
+                    <video src={likelyRootCause.visualEvidence.dataUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <img src={likelyRootCause.visualEvidence.dataUrl} alt="Visual Proof" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  )}
+                </div>
+              )}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.2rem' }}>
+                  <span style={{ fontSize: '0.7rem', background: 'rgba(99, 102, 241, 0.25)', color: '#c7d2fe', padding: '1px 6px', borderRadius: '8px', fontWeight: 700 }}>
+                    👁️ Visual Evidence Analyzed
+                  </span>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                    {likelyRootCause.visualEvidence.name}
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                  {likelyRootCause.visualEvidence.summary}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -294,78 +370,6 @@ export function TriageResultPanel({
           </div>
         </div>
       )}
-
-      {/* 5. ACTION PLAN TO FIX (Feature 4) */}
-      <div className="glass-panel">
-        <div className="panel-header">
-          <div className="panel-title-wrapper">
-            <CheckCircle size={18} style={{ color: '#10b981' }} />
-            <div>
-              <h3 className="panel-title" style={{ fontSize: '1.02rem', fontWeight: 700 }}>
-                Action Plan to Fix (Sequential Playbook)
-              </h3>
-              <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                Step-by-step remediation guide with interactive checklist
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="panel-body">
-          <div className="next-steps-list">
-            {nextSteps.map((step, idx) => {
-              const isDone = Boolean(completedSteps[step.id]);
-              return (
-                <div 
-                  key={step.id} 
-                  className="step-card"
-                  style={{ 
-                    opacity: isDone ? 0.65 : 1,
-                    borderLeft: isDone ? '3px solid #10b981' : '3px solid #6366f1'
-                  }}
-                >
-                  <div className="step-header">
-                    <div 
-                      className="step-title" 
-                      style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.6rem' }}
-                      onClick={() => toggleStepDone(step.id)}
-                    >
-                      {isDone ? (
-                        <CheckSquare size={18} style={{ color: '#10b981' }} />
-                      ) : (
-                        <Square size={18} style={{ color: 'var(--text-dim)' }} />
-                      )}
-                      <span style={{ textDecoration: isDone ? 'line-through' : 'none' }}>
-                        {idx + 1}. {step.title}
-                      </span>
-                    </div>
-                    <span className="step-category-pill">{step.category}</span>
-                  </div>
-
-                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', paddingLeft: '1.75rem' }}>
-                    {step.detail}
-                  </p>
-
-                  {step.command && (
-                    <div style={{ paddingLeft: '1.75rem' }}>
-                      <div className="step-command-box">
-                        <code style={{ fontSize: '0.78rem' }}>{step.command}</code>
-                        <button
-                          className="btn-icon-copy"
-                          onClick={() => handleCopy(step.command, step.id)}
-                          title="Copy command to clipboard"
-                        >
-                          {copiedId === step.id ? <Check size={14} style={{ color: '#10b981' }} /> : <Copy size={14} />}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
 
       {/* 6. JIRA DUPLICATE BUG DETECTION (Feature 3) */}
       {duplicateCandidates && duplicateCandidates.length > 0 && (

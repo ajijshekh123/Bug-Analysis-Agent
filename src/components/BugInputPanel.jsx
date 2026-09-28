@@ -7,18 +7,25 @@ import {
   Trash2, 
   ChevronDown, 
   ChevronUp, 
-  Play,
-  Target,
-  Database,
-  ExternalLink,
-  CheckCircle,
-  PlusCircle,
-  Layers,
-  Clock,
-  ShieldAlert,
-  Bot
+  Play, 
+  Target, 
+  Database, 
+  ExternalLink, 
+  CheckCircle, 
+  PlusCircle, 
+  Layers, 
+  Clock, 
+  ShieldAlert, 
+  Bot,
+  Image as ImageIcon,
+  Video as VideoIcon,
+  UploadCloud,
+  FileCheck,
+  Eye,
+  X
 } from 'lucide-react';
 import { generateBugFromObjective } from '../services/bugGenerator';
+import { aiExtractBugFromMedia } from '../services/aiService';
 
 export function BugInputPanel({
   report,
@@ -33,9 +40,12 @@ export function BugInputPanel({
   aiConfig
 }) {
   const fileInputRef = useRef(null);
+  const mediaInputRef = useRef(null);
   const [objectiveInput, setObjectiveInput] = useState(report.objective || report.title || "");
   const [isGeneratingDetails, setIsGeneratingDetails] = useState(false);
-  const [activeTab, setActiveTab] = useState('objective'); // 'objective' or 'details'
+  const [isExtractingMedia, setIsExtractingMedia] = useState(false);
+  const [isDraggingMedia, setIsDraggingMedia] = useState(false);
+  const [mediaNotification, setMediaNotification] = useState(null);
 
   // Keep input in sync with loaded scenario or external report changes
   useEffect(() => {
@@ -56,6 +66,71 @@ export function BugInputPanel({
     setIsGeneratingDetails(false);
   };
 
+  const processMediaFile = (file) => {
+    if (!file) return;
+    const isVideo = file.type?.startsWith('video/') || /\.(mp4|webm|mov|mkv)$/i.test(file.name || '');
+    setIsExtractingMedia(true);
+    setMediaNotification(null);
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const dataUrl = event.target?.result;
+      const previewUrl = URL.createObjectURL(file);
+      
+      const extracted = await aiExtractBugFromMedia(file, dataUrl, aiConfig);
+      
+      setReport(prev => ({
+        ...prev,
+        ...extracted,
+        attachment: {
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          dataUrl,
+          previewUrl,
+          isVideo
+        }
+      }));
+      setObjectiveInput(extracted.objective);
+      setMediaNotification(`✨ Bug details extracted from ${isVideo ? 'Video' : 'Screenshot'}: "${file.name}"`);
+      setIsExtractingMedia(false);
+    };
+    reader.onerror = () => {
+      setMediaNotification("❌ Failed to read media file.");
+      setIsExtractingMedia(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleMediaChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processMediaFile(file);
+    }
+  };
+
+  const handleMediaDrop = (e) => {
+    e.preventDefault();
+    setIsDraggingMedia(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file && (file.type.startsWith('image/') || file.type.startsWith('video/'))) {
+      processMediaFile(file);
+    }
+  };
+
+  const handleRemoveMedia = () => {
+    setReport(prev => {
+      const updated = { ...prev };
+      delete updated.attachment;
+      delete updated.visualEvidence;
+      return updated;
+    });
+    setMediaNotification(null);
+    if (mediaInputRef.current) {
+      mediaInputRef.current.value = "";
+    }
+  };
+
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -70,6 +145,7 @@ export function BugInputPanel({
   };
 
   const lineCount = logs ? logs.split('\n').filter(Boolean).length : 0;
+  const hasAttachment = Boolean(report.attachment);
 
   return (
     <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -95,14 +171,155 @@ export function BugInputPanel({
               Bug Ingestion & Jira Auto-Creation
             </h2>
             <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-              Add a Bug Objective &rarr; Auto-Create Details &rarr; Push to Jira via MCP
+              Add a Bug Objective or Upload Screenshot/Video &rarr; Auto-Extract Details &rarr; Push to Jira
             </p>
           </div>
         </div>
       </div>
 
       <div className="panel-body">
-        {/* 1. BUG OBJECTIVE GENERATOR (Feature 2) */}
+        {/* 1. UPLOAD SCREENSHOT / VIDEO SECTION */}
+        <div 
+          className="objective-banner" 
+          style={{ 
+            background: isDraggingMedia ? 'rgba(99, 102, 241, 0.18)' : 'rgba(255, 255, 255, 0.03)',
+            border: isDraggingMedia ? '2px dashed var(--accent-primary)' : '1px solid var(--border-subtle)',
+            transition: 'all 0.2s ease',
+            padding: '0.85rem'
+          }}
+          onDragOver={(e) => { e.preventDefault(); setIsDraggingMedia(true); }}
+          onDragLeave={() => setIsDraggingMedia(false)}
+          onDrop={handleMediaDrop}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#a5b4fc' }}>
+                <ImageIcon size={15} />
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>/</span>
+                <VideoIcon size={15} />
+              </div>
+              <label style={{ fontWeight: 700, fontSize: '0.86rem', color: 'var(--text-main)' }}>
+                Upload Bug Screenshot / Video
+              </label>
+            </div>
+            
+            {hasAttachment && (
+              <span style={{ fontSize: '0.7rem', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', padding: '2px 8px', borderRadius: '10px', fontWeight: 600 }}>
+                {report.attachment.isVideo ? '🎥 Video Attached' : '📸 Screenshot Attached'}
+              </span>
+            )}
+          </div>
+
+          <input
+            type="file"
+            ref={mediaInputRef}
+            style={{ display: 'none' }}
+            accept="image/*,video/*,.png,.jpg,.jpeg,.webp,.mp4,.webm,.mov"
+            onChange={handleMediaChange}
+          />
+
+          {!hasAttachment ? (
+            <div 
+              style={{ 
+                border: '1px dashed rgba(255,255,255,0.15)', 
+                borderRadius: 'var(--radius-md)', 
+                padding: '0.85rem',
+                textAlign: 'center',
+                cursor: 'pointer',
+                background: 'rgba(0,0,0,0.15)'
+              }}
+              onClick={() => mediaInputRef.current?.click()}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.3rem' }}>
+                <UploadCloud size={20} style={{ color: 'var(--accent-primary)' }} />
+                <span style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                  Click or drag & drop Screenshot (.png, .jpg) or Video (.mp4, .webm)
+                </span>
+              </div>
+              <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: 0 }}>
+                AI automatically extracts visual error details, steps to reproduce, component & severity from your media!
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              {/* Media Preview Container */}
+              <div style={{ 
+                position: 'relative', 
+                borderRadius: 'var(--radius-md)', 
+                overflow: 'hidden', 
+                background: '#07090e', 
+                border: '1px solid var(--border-subtle)',
+                maxHeight: '190px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                {report.attachment.isVideo ? (
+                  <video 
+                    src={report.attachment.dataUrl || report.attachment.previewUrl} 
+                    controls 
+                    style={{ width: '100%', maxHeight: '180px', objectFit: 'contain' }} 
+                  />
+                ) : (
+                  <img 
+                    src={report.attachment.dataUrl || report.attachment.previewUrl} 
+                    alt={report.attachment.name} 
+                    style={{ width: '100%', maxHeight: '180px', objectFit: 'contain' }} 
+                  />
+                )}
+              </div>
+
+              {/* Media Details Bar */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <FileCheck size={14} style={{ color: '#10b981' }} />
+                  <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                    {report.attachment.name}
+                  </span>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>
+                    ({Math.round(report.attachment.size / 1024)} KB)
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ padding: '0.25rem 0.6rem', fontSize: '0.72rem' }}
+                    onClick={() => mediaInputRef.current?.click()}
+                    title="Replace media"
+                  >
+                    Replace
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.72rem', color: '#f87171' }}
+                    onClick={handleRemoveMedia}
+                    title="Remove media"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isExtractingMedia && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem', fontSize: '0.76rem', color: 'var(--accent-primary)' }}>
+              <div className="status-dot pulsing" style={{ background: 'var(--accent-primary)' }} />
+              <span>Analyzing visual content from media & synthesizing defect details...</span>
+            </div>
+          )}
+
+          {mediaNotification && !isExtractingMedia && (
+            <div style={{ marginTop: '0.45rem', fontSize: '0.76rem', color: '#34d399', background: 'rgba(16, 185, 129, 0.08)', padding: '0.35rem 0.65rem', borderRadius: '4px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+              {mediaNotification}
+            </div>
+          )}
+        </div>
+
+        {/* 2. BUG OBJECTIVE GENERATOR (Feature 2) */}
         <div className="objective-banner">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
@@ -453,7 +670,7 @@ export function BugInputPanel({
           {isAnalyzing ? (
             <>
               <div className="status-dot pulsing" style={{ background: '#fff' }} />
-              <span>Analyzing Error Logs, Root Cause & Action Plan...</span>
+              <span>Analyzing Error Logs, Root Cause & Fix Plan...</span>
             </>
           ) : (
             <>

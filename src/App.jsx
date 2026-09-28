@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { BugInputPanel } from './components/BugInputPanel';
 import { TriageResultPanel } from './components/TriageResultPanel';
-import { EvidenceTabs } from './components/EvidenceTabs';
 import { ConfigModal } from './components/ConfigModal';
 import { McpIntegrationGuideModal } from './components/McpIntegrationGuideModal';
 import { MOCK_SCENARIOS } from './data/mockScenarios';
@@ -196,10 +195,6 @@ export default function App() {
         </div>
       </main>
 
-      {/* 4. Underlying MCP Evidence & Log Analysis Inspector */}
-      <div style={{ maxWidth: '1720px', margin: '0 auto', padding: '0 1.75rem 2rem', width: '100%' }}>
-        <EvidenceTabs analysis={analysis} />
-      </div>
 
       {/* 5. Configuration Modal (Jira & GitHub MCP Connectors + AI Engine / Ollama) */}
       <ConfigModal 
