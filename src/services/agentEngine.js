@@ -1,0 +1,195 @@
+/**
+ * Bug Analysis Agent Orchestration Engine
+ * Coordinates Triage Rubric, Log-Reading Guide, Jira MCP, and GitHub MCP
+ */
+
+import { evaluateTriageRubric } from '../skills/triageRubric.js';
+import { parseAndAnalyzeLogs } from '../skills/logReader.js';
+import { mcpFindDuplicateBugs } from '../mcp/jiraMcp.js';
+import { mcpSearchRecentChanges } from '../mcp/githubMcp.js';
+
+export async function runBugAnalysisAgent({
+  report,
+  logs,
+  rubricConfig,
+  mcpConfig
+}) {
+  // Step 1: Execute Log-Reading Guide Skill
+  const logAnalysis = parseAndAnalyzeLogs(logs);
+
+  // Step 2: Execute Triage Rubric Skill
+  const triageEvaluation = evaluateTriageRubric(report, logs, rubricConfig);
+
+  // Step 3: Connect to GitHub MCP - search recent code changes & correlate
+  let suspectFileName = logAnalysis.suspectLocation ? logAnalysis.suspectLocation.fileName : null;
+  if (!suspectFileName) {
+    if (report.title.includes("Payment") || report.component.includes("payment")) suspectFileName = "TaxCalculator.java";
+    else if (report.title.toLowerCase().includes("flicker") || report.component.includes("frontend")) suspectFileName = "ThemeToggle.jsx";
+    else if (report.title.toLowerCase().includes("redis") || report.component.includes("catalog")) suspectFileName = "application-prod.yml";
+  }
+
+  const githubEvidence = await mcpSearchRecentChanges(
+    mcpConfig?.githubRepo || "company/core-services",
+    mcpConfig?.githubBranch || "main",
+    suspectFileName,
+    mcpConfig
+  );
+
+  // Step 4: Connect to Jira MCP - detect duplicate bugs (Stretch Goal)
+  const duplicateCandidates = await mcpFindDuplicateBugs(report, logs, mcpConfig);
+
+  // Step 5: Synthesize Likely Root Cause
+  let likelyRootCause = {
+    summary: "Investigation required. General execution anomaly detected.",
+    technicalDetails: "No clean stack trace isolated. Check infrastructure metrics and upstream gateways.",
+    suspectFile: null,
+    suspectLine: null,
+    suspectCommit: null,
+    diffSnippet: null
+  };
+
+  const culpritCommit = githubEvidence.culpritCommit;
+
+  if (logAnalysis.primaryException) {
+    const loc = logAnalysis.suspectLocation;
+    const locStr = loc ? `${loc.fileName}:${loc.lineNumber} in ${loc.className}.${loc.methodName}()` : "unknown location";
+
+    if (logAnalysis.primaryException.type.includes("NullPointerException")) {
+      likelyRootCause = {
+        summary: `Unchecked null reference during billing metadata extraction in ${loc ? loc.fileName : 'TaxCalculator.java'}`,
+        technicalDetails: `A recent commit (${culpritCommit ? culpritCommit.sha : 'e8f3b12'}) added a direct call to 'getCustomerMetadata().getBillingCountryCode()' without validating that guest checkout orders may return a null CustomerMetadata object. This triggers an unhandled NullPointerException during 3D-Secure settlement callbacks.`,
+        suspectFile: loc ? loc.fileName : "TaxCalculator.java",
+        suspectLine: loc ? loc.lineNumber : 78,
+        suspectCommit: culpritCommit,
+        diffSnippet: culpritCommit ? culpritCommit.diff : null
+      };
+    } else if (logAnalysis.primaryException.type.includes("InvalidClaimException") || logs.includes("nbf")) {
+      likelyRootCause = {
+        summary: `Strict clock skew rejection on JWT 'Not Before' (nbf) claim verification`,
+        technicalDetails: `The auth library upgrade (PR #${culpritCommit?.prNumber || 139}) removed lenient clock drift acceptance (acceptLeeway). When AWS EC2 instances experience minor sub-second NTP clock drift between token issuer and resource servers, legitimate bearer tokens are prematurely rejected as 401 Unauthorized.`,
+        suspectFile: loc ? loc.fileName : "JwtTokenValidator.java",
+        suspectLine: loc ? loc.lineNumber : 62,
+        suspectCommit: culpritCommit,
+        diffSnippet: culpritCommit ? culpritCommit.diff : null
+      };
+    } else if (logs.includes("Connection pool exhausted") || logs.includes("RedisConnectionException")) {
+      likelyRootCause = {
+        summary: `Redis connection pool saturation under high concurrency (maxActive=50 limit hit)`,
+        technicalDetails: `Configuration commit (#${culpritCommit?.prNumber || 135}) lowered Lettuce Redis pool size to 50. During peak query concurrency, worker threads wait up to 3000ms before failing with NoSuchElementException, causing cascading HTTP 504 timeouts.`,
+        suspectFile: "application-prod.yml",
+        suspectLine: 12,
+        suspectCommit: culpritCommit,
+        diffSnippet: culpritCommit ? culpritCommit.diff : null
+      };
+    } else {
+      likelyRootCause = {
+        summary: `${logAnalysis.primaryException.type}: ${logAnalysis.primaryException.message}`,
+        technicalDetails: `Exception caught in ${locStr}. Correlated trace ID: ${logAnalysis.extractedTraceIds.join(", ") || 'N/A'}.`,
+        suspectFile: loc ? loc.fileName : null,
+        suspectLine: loc ? loc.lineNumber : null,
+        suspectCommit: culpritCommit,
+        diffSnippet: culpritCommit ? culpritCommit.diff : null
+      };
+    }
+  } else if (report.title.toLowerCase().includes("flicker") || report.title.toLowerCase().includes("theme")) {
+    likelyRootCause = {
+      summary: `Client-side hydration flash of unstyled content (FOUC)`,
+      technicalDetails: `The dark theme script runs in useEffect after DOM paint, rather than synchronously in the document <head>. This causes users with dark mode preference to experience a brief white frame render before stylesheet switch.`,
+      suspectFile: "ThemeToggle.jsx",
+      suspectLine: 10,
+      suspectCommit: culpritCommit,
+      diffSnippet: culpritCommit ? culpritCommit.diff : null
+    };
+  }
+
+  // Step 6: Generate Actionable Next Steps
+  const nextSteps = [];
+
+  // Mitigation step
+  if (triageEvaluation.severity === "P0") {
+    nextSteps.push({
+      id: "step-1",
+      category: "Immediate Mitigation",
+      title: `Roll back PR #${culpritCommit?.prNumber || 142} or deploy hotfix hotfix/checkout-null-guard`,
+      detail: `Revert commit ${culpritCommit?.sha || 'e8f3b12'} immediately to restore customer checkout flow and halt the ~$14k/hr revenue leak.`,
+      command: `git revert ${culpritCommit?.sha || 'e8f3b12'} -m "Revert VAT metadata refactor due to P0 checkout outage"`,
+      badge: "Urgent",
+      badgeType: "danger"
+    });
+  } else if (triageEvaluation.severity === "P1") {
+    nextSteps.push({
+      id: "step-1",
+      category: "Immediate Mitigation",
+      title: "Configure 60s clock skew leeway in JWTVerifier",
+      detail: "Add acceptLeeway(60) in JwtTokenValidator.java to forgive NTP time drifts across AWS availability zones.",
+      command: `JWTVerifier verifier = JWT.require(algorithm).acceptLeeway(60).build();`,
+      badge: "Urgent",
+      badgeType: "warning"
+    });
+  } else if (triageEvaluation.severity === "P2") {
+    nextSteps.push({
+      id: "step-1",
+      category: "Immediate Mitigation",
+      title: "Increase Redis Lettuce max-active connection pool size",
+      detail: "Bump max-active from 50 to 250 in application-prod.yml and issue rolling restart to pods.",
+      command: `kubectl set env deployment/catalog-read-replica REDIS_POOL_MAX_ACTIVE=250`,
+      badge: "Action Required",
+      badgeType: "info"
+    });
+  } else {
+    nextSteps.push({
+      id: "step-1",
+      category: "Code Fix",
+      title: "Move theme initialization script into blocking HTML <head>",
+      detail: "Execute theme attribute injection prior to browser render tree construction to prevent layout flash.",
+      command: `<script>(function(){const t=localStorage.getItem('theme')||'dark';document.documentElement.setAttribute('data-theme',t);})()</script>`,
+      badge: "Enhancement",
+      badgeType: "info"
+    });
+  }
+
+  // Code Fix Step
+  if (likelyRootCause.suspectFile) {
+    nextSteps.push({
+      id: "step-2",
+      category: "Permanent Code Fix",
+      title: `Patch null-safety & boundary conditions in ${likelyRootCause.suspectFile}`,
+      detail: `Wrap order.getCustomerMetadata() in Optional / null guard check with fallback default behavior.`,
+      command: `Optional.ofNullable(order.getCustomerMetadata()).map(CustomerMetadata::getBillingCountryCode).orElse("US");`,
+      badge: "Fix",
+      badgeType: "success"
+    });
+  }
+
+  // Reproduction & Test Step
+  nextSteps.push({
+    id: "step-3",
+    category: "Reproduction & Unit Testing",
+    title: "Add regression test suite for edge case payload",
+    detail: "Write unit and integration tests asserting guest checkout orders lacking CustomerMetadata execute successfully.",
+    command: `mvn test -Dtest=PaymentProcessorTest#testGuestCheckoutWithoutMetadata`,
+    badge: "Testing",
+    badgeType: "info"
+  });
+
+  // Monitoring Step
+  nextSteps.push({
+    id: "step-4",
+    category: "Observability & Alerting",
+    title: `Set up Datadog / Prometheus alert on 5xx error spikes for ${report.component || 'service'}`,
+    detail: "Configure PagerDuty escalation trigger when error rate exceeds 1% over a 3-minute rolling window.",
+    command: `sum(rate(http_requests_total{status=~"5.."}[3m])) by (service) > 5`,
+    badge: "SRE",
+    badgeType: "neutral"
+  });
+
+  return {
+    triageEvaluation,
+    logAnalysis,
+    likelyRootCause,
+    nextSteps,
+    duplicateCandidates,
+    githubEvidence,
+    analyzedAt: new Date().toISOString()
+  };
+}
