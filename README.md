@@ -7,8 +7,16 @@
 
 ## 🚀 Key Features
 
-- **📥 Dual Ingestion Layer**:
-  - Structured bug reports: Summary, affected component, environment, version, description.
+- **🤖 Dynamic AI Engine & Ollama Integration**:
+  - **Local Ollama LLM Connection**: Connect directly to local models (`llama3`, `mistral`, `deepseek-r1`, etc.) via `http://localhost:11434` with zero CORS issues via Vite proxy.
+  - **Dynamic Semantic Engine Fallback**: Works immediately out-of-the-box without requiring an Ollama server running. Any custom **Bug Objective** entered dynamically generates:
+    - Complete defect fields: Description, Pre-conditions, Steps to Reproduce, Expected/Actual Results, Component, Module Name, Priority, Severity, and Impacted Sprint.
+    - Deep diagnostic triage: Error/Logs analysis, Root Cause identification, Impacted Modules, Critical Outage evaluation, and Step-by-Step Action Plan.
+  - **AI Model Status & Settings**: Test connection, pick target model, and configure custom host endpoints directly in the UI.
+
+- **📥 Dual Ingestion & Bug Objective Generator**:
+  - **Bug Objective Input**: Type any natural language bug objective (e.g., *"Users cannot download PDF invoice on Safari 17"*), click **Generate Full Bug Details**, and watch AI automatically synthesize structured QA defect specifications.
+  - Structured bug reports: Summary, affected component, environment, version, description, pre-conditions, steps, actual/expected.
   - Raw server logs & stack traces: Live paste or `.log` / `.txt` / `.json` file uploader.
   - Pre-loaded enterprise scenarios (**P0** Payment NPE, **P1** Auth 401 Loop, **P2** Redis Saturation, **P3** UI theme flicker).
 
@@ -16,23 +24,15 @@
   - **Triage Rubric Skill**: Automatically evaluates severity (**P0 Blocker**, **P1 High**, **P2 Medium**, **P3 Low**), SLA deadlines, priority level, blast radius, revenue impact, and customer workaround viability.
   - **Log-Reading Guide Skill**: Intelligently cleanses noise, isolates application stack frames from framework internals, extracts distributed `[TraceID]` identifiers, and detects error cascades.
 
-- **🔌 Model Context Protocol (MCP) Tool Integrations**:
-  - **Jira MCP**: Queries historical bug databases, retrieves past incident resolutions, and links related issues.
+- **🔌 Model Context Protocol (MCP) & Jira Board Integrations**:
+  - **Jira MCP & Live Board Sync**: Create bugs automatically onto your Jira board with generated unique Jira IDs (e.g., `CORE-1049`), track sync status, and view Jira ticket history.
   - **GitHub MCP**: Scans recent commits and pull requests, correlates suspect files from the stack trace, and displays suspect code blame and unified git diffs.
   - **Stretch Goal — Duplicate Bug Detection**: Uses semantic text similarity and token overlap to discover duplicate tickets in Jira with match percentages and provides a 1-click **"Link as Duplicate"** workflow.
   - 📖 **[Detailed MCP Integration Guide](docs/MCP_INTEGRATION_GUIDE.md)**: Step-by-step instructions on setting up Jira & GitHub MCP servers.
 
-- **📊 User-Friendly Output Dashboard (Designed for Everyone)**:
-  - **Severity & Impact Card**: Plain-English urgency rating (e.g., *Fix within 1 hour - Real users blocked*), confidence meter, and financial risk assessment.
-  - **Likely Root Cause Diagnosis**: Jargon-free explanation of what broke and why, with an optional toggle to inspect technical code lines and Git diffs.
-  - **Sequential Remediation Playbook**: Actionable checklist with interactive checkboxes so team members can tick off steps as they complete them.
-  - **Evidence Inspector Tabs**: Multi-tab drawer to explore raw GitHub commits, historical Jira issues, and level-filtered log events (`ALL`, `ERROR`, `WARN`).
-
-- **⚙️ Full Configuration UI & In-App Guide**:
-  - In-app **"How to Integrate MCP Tools"** interactive tutorial.
-  - Configurable Jira MCP credentials (Host URL, Project Key, Token) with live API or enterprise mock database toggle.
-  - Configurable GitHub MCP credentials (Repository, Branch, Personal Access Token).
-  - Customizable Triage Rubric SLA hours, escalation keywords, and log-parsing app code prefixes.
+- **🎨 Themes & Responsive UX**:
+  - **Light & Dark Theme Toggle**: Seamless transition between high-contrast Dark Mode and clean enterprise Light Mode, persisted in `localStorage`.
+  - Responsive, glassmorphic UI with zero layout shifts.
 
 ---
 
@@ -165,5 +165,9 @@ npm run build
 
 ---
 
+## 👨‍💻 Author & Attribution
+**Prepared and Analysed by Mohammad Ajij Shekh, 2026**
+
 ## 📄 License
 This project is licensed under the MIT License.
+

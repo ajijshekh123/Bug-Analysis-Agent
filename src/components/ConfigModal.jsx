@@ -7,8 +7,13 @@ import {
   Sliders, 
   Check, 
   FileCode,
-  ShieldAlert
+  ShieldAlert,
+  Cpu,
+  Bot,
+  RefreshCw,
+  AlertCircle
 } from 'lucide-react';
+import { testOllamaConnection } from '../services/aiService';
 
 export function ConfigModal({
   isOpen,
@@ -16,18 +21,32 @@ export function ConfigModal({
   mcpConfig,
   setMcpConfig,
   rubricConfig,
-  setRubricConfig
+  setRubricConfig,
+  aiConfig,
+  setAiConfig
 }) {
   const [activeTab, setActiveTab] = useState('mcp');
   const [tempMcp, setTempMcp] = useState({ ...mcpConfig });
   const [tempRubric, setTempRubric] = useState({ ...rubricConfig });
+  const [tempAi, setTempAi] = useState({ ...aiConfig });
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [isTestingOllama, setIsTestingOllama] = useState(false);
+  const [ollamaStatus, setOllamaStatus] = useState(null);
 
   if (!isOpen) return null;
+
+  const handleTestOllama = async () => {
+    setIsTestingOllama(true);
+    setOllamaStatus(null);
+    const res = await testOllamaConnection(tempAi.ollamaHost);
+    setOllamaStatus(res);
+    setIsTestingOllama(false);
+  };
 
   const handleSave = () => {
     setMcpConfig(tempMcp);
     setRubricConfig(tempRubric);
+    if (setAiConfig) setAiConfig(tempAi);
     setSavedSuccess(true);
     setTimeout(() => {
       setSavedSuccess(false);
@@ -41,7 +60,7 @@ export function ConfigModal({
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <Settings size={20} style={{ color: '#818cf8' }} />
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Agent & MCP Tool Configuration</h3>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Agent, AI & MCP Configuration</h3>
           </div>
           <button 
             className="btn-icon-copy" 
@@ -62,6 +81,13 @@ export function ConfigModal({
             <span>MCP Tool Connectors</span>
           </button>
           <button
+            className={`tab-btn ${activeTab === 'ai' ? 'active' : ''}`}
+            onClick={() => setActiveTab('ai')}
+          >
+            <Bot size={14} />
+            <span>AI Engine (Ollama / Local AI)</span>
+          </button>
+          <button
             className={`tab-btn ${activeTab === 'rubric' ? 'active' : ''}`}
             onClick={() => setActiveTab('rubric')}
           >
@@ -71,6 +97,7 @@ export function ConfigModal({
         </div>
 
         <div className="modal-body">
+          {/* TAB 1: MCP CONNECTORS */}
           {activeTab === 'mcp' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               {/* JIRA MCP SECTION */}
@@ -200,6 +227,111 @@ export function ConfigModal({
             </div>
           )}
 
+          {/* TAB 2: AI ENGINE (OLLAMA / LOCAL AI) */}
+          {activeTab === 'ai' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div style={{ 
+                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.05))',
+                border: '1px solid rgba(99, 102, 241, 0.25)',
+                borderRadius: 'var(--radius-md)',
+                padding: '1rem'
+              }}>
+                <div style={{ fontWeight: 700, fontSize: '0.94rem', color: '#e0e7ff', marginBottom: '0.35rem' }}>
+                  🦙 Ollama Local AI & Dynamic Intelligence
+                </div>
+                <p style={{ fontSize: '0.82rem', color: '#c7d2fe', lineHeight: 1.5 }}>
+                  Connect your local Ollama instance to analyze <strong>any custom Bug Objective</strong> and generate contextual defect reports, root cause diagnostics, and fix plans.
+                </p>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">AI Engine Provider</label>
+                <select
+                  value={tempAi.provider}
+                  onChange={(e) => setTempAi({ ...tempAi, provider: e.target.value })}
+                >
+                  <option value="ollama">🦙 Ollama (Local AI Server)</option>
+                  <option value="dynamic">🧠 Built-in Dynamic AI Engine (Instant)</option>
+                </select>
+              </div>
+
+              {tempAi.provider === 'ollama' && (
+                <>
+                  <div className="form-row-2">
+                    <div className="form-group">
+                      <label className="form-label">Ollama Host URL</label>
+                      <input 
+                        type="text" 
+                        value={tempAi.ollamaHost}
+                        onChange={(e) => setTempAi({ ...tempAi, ollamaHost: e.target.value })}
+                        placeholder="http://localhost:11434"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Model Name</label>
+                      <input 
+                        type="text" 
+                        value={tempAi.model}
+                        onChange={(e) => setTempAi({ ...tempAi, model: e.target.value })}
+                        placeholder="e.g. llama3, mistral, deepseek-r1"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Ping test button */}
+                  <div>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={handleTestOllama}
+                      disabled={isTestingOllama}
+                      style={{ fontSize: '0.82rem' }}
+                    >
+                      {isTestingOllama ? (
+                        <>
+                          <RefreshCw size={13} className="pulsing" />
+                          <span>Testing Ollama Connection...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Cpu size={14} style={{ color: '#818cf8' }} />
+                          <span>Test Ollama Connection</span>
+                        </>
+                      )}
+                    </button>
+
+                    {ollamaStatus && (
+                      <div style={{ 
+                        marginTop: '0.65rem',
+                        padding: '0.65rem 0.85rem', 
+                        borderRadius: '6px',
+                        fontSize: '0.78rem',
+                        background: ollamaStatus.connected ? 'rgba(16, 185, 129, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+                        border: ollamaStatus.connected ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)',
+                        color: ollamaStatus.connected ? '#6ee7b7' : '#fcd34d'
+                      }}>
+                        {ollamaStatus.connected ? (
+                          <>
+                            <strong>✅ Ollama is Online!</strong> Installed models: {ollamaStatus.models.join(', ')}
+                          </>
+                        ) : (
+                          <>
+                            <strong>⚠️ Ollama Not Detected Locally:</strong>
+                            <br />
+                            Run <code>ollama serve</code> or <code>ollama run {tempAi.model}</code> in your terminal to start Ollama.
+                            <br />
+                            <em>Note: The Built-in Dynamic AI Engine will seamlessly analyze your custom Bug Objectives while Ollama is offline.</em>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* TAB 3: TRIAGE RUBRIC */}
           {activeTab === 'rubric' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
@@ -279,19 +411,6 @@ export function ConfigModal({
                     }
                   })}
                 />
-              </div>
-
-              {/* Log Reader Rules */}
-              <div className="form-group">
-                <label className="form-label">Log-Reading Application Code Prefix Filter</label>
-                <input 
-                  type="text" 
-                  defaultValue="com.company"
-                  placeholder="e.g. com.company, @org/, src/app/"
-                />
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>
-                  Isolates your business logic stack trace frames from 3rd-party framework frames (Spring, Node internals, etc).
-                </span>
               </div>
             </div>
           )}

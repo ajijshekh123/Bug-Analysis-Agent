@@ -7,12 +7,14 @@ import { evaluateTriageRubric } from '../skills/triageRubric.js';
 import { parseAndAnalyzeLogs } from '../skills/logReader.js';
 import { mcpFindDuplicateBugs } from '../mcp/jiraMcp.js';
 import { mcpSearchRecentChanges } from '../mcp/githubMcp.js';
+import { aiAnalyzeRootCauseAndPlan, DEFAULT_AI_CONFIG } from './aiService.js';
 
 export async function runBugAnalysisAgent({
   report,
   logs,
   rubricConfig,
-  mcpConfig
+  mcpConfig,
+  aiConfig = DEFAULT_AI_CONFIG
 }) {
   // Step 1: Execute Log-Reading Guide Skill
   const logAnalysis = parseAndAnalyzeLogs(logs);
@@ -102,21 +104,37 @@ export async function runBugAnalysisAgent({
     };
   }
 
-  // Step 6: Generate Actionable Next Steps
-  const nextSteps = [];
+  // Query AI Service (Ollama / Local AI) for deep contextual analysis
+  const aiResult = await aiAnalyzeRootCauseAndPlan(report, logs, aiConfig);
 
-  // Mitigation step
-  if (triageEvaluation.severity === "P0") {
-    nextSteps.push({
-      id: "step-1",
-      category: "Immediate Mitigation",
-      title: `Roll back PR #${culpritCommit?.prNumber || 142} or deploy hotfix hotfix/checkout-null-guard`,
-      detail: `Revert commit ${culpritCommit?.sha || 'e8f3b12'} immediately to restore customer checkout flow and halt the ~$14k/hr revenue leak.`,
-      command: `git revert ${culpritCommit?.sha || 'e8f3b12'} -m "Revert VAT metadata refactor due to P0 checkout outage"`,
-      badge: "Urgent",
-      badgeType: "danger"
-    });
-  } else if (triageEvaluation.severity === "P1") {
+  if (!logAnalysis.primaryException && !report.title.toLowerCase().includes("flicker") && !report.title.toLowerCase().includes("theme")) {
+    likelyRootCause = {
+      summary: aiResult.summary,
+      technicalDetails: aiResult.technicalDetails,
+      suspectFile: aiResult.suspectFile || (report.moduleName ? `${report.moduleName}.java` : "CoreService.java"),
+      suspectLine: aiResult.suspectLine || 48,
+      suspectCommit: culpritCommit,
+      diffSnippet: culpritCommit ? culpritCommit.diff : null
+    };
+  }
+
+  // Step 6: Generate Actionable Next Steps
+  let nextSteps = [];
+
+  if (!logAnalysis.primaryException && aiResult.nextSteps && aiResult.nextSteps.length > 0) {
+    nextSteps = aiResult.nextSteps;
+  } else {
+    if (triageEvaluation.severity === "P0") {
+      nextSteps.push({
+        id: "step-1",
+        category: "Immediate Mitigation",
+        title: `Roll back PR #${culpritCommit?.prNumber || 142} or deploy hotfix hotfix/checkout-null-guard`,
+        detail: `Revert commit ${culpritCommit?.sha || 'e8f3b12'} immediately to restore customer checkout flow and halt the ~$14k/hr revenue leak.`,
+        command: `git revert ${culpritCommit?.sha || 'e8f3b12'} -m "Revert VAT metadata refactor due to P0 checkout outage"`,
+        badge: "Urgent",
+        badgeType: "danger"
+      });
+    } else if (triageEvaluation.severity === "P1") {
     nextSteps.push({
       id: "step-1",
       category: "Immediate Mitigation",
@@ -172,16 +190,17 @@ export async function runBugAnalysisAgent({
     badgeType: "info"
   });
 
-  // Monitoring Step
-  nextSteps.push({
-    id: "step-4",
-    category: "Observability & Alerting",
-    title: `Set up Datadog / Prometheus alert on 5xx error spikes for ${report.component || 'service'}`,
-    detail: "Configure PagerDuty escalation trigger when error rate exceeds 1% over a 3-minute rolling window.",
-    command: `sum(rate(http_requests_total{status=~"5.."}[3m])) by (service) > 5`,
-    badge: "SRE",
-    badgeType: "neutral"
-  });
+    // Monitoring Step
+    nextSteps.push({
+      id: "step-4",
+      category: "Observability & Alerting",
+      title: `Set up Datadog / Prometheus alert on 5xx error spikes for ${report.component || 'service'}`,
+      detail: "Configure PagerDuty escalation trigger when error rate exceeds 1% over a 3-minute rolling window.",
+      command: `sum(rate(http_requests_total{status=~"5.."}[3m])) by (service) > 5`,
+      badge: "SRE",
+      badgeType: "neutral"
+    });
+  }
 
   // Calculate Outage Level
   let criticalOutageLevel = "🟢 LOW RISK (Cosmetic / Low Priority)";

@@ -10,16 +10,35 @@ import { DEFAULT_RUBRIC_CONFIG } from './skills/triageRubric';
 import { runBugAnalysisAgent } from './services/agentEngine';
 import { mcpLinkBugAsDuplicate, mcpCreateJiraBug } from './mcp/jiraMcp';
 import { generateBugFromObjective } from './services/bugGenerator';
+import { DEFAULT_AI_CONFIG } from './services/aiService';
 import { Sparkles } from 'lucide-react';
 
 export default function App() {
   const [theme, setTheme] = useState(localStorage.getItem('sentinx_theme') || 'dark');
   const [selectedScenarioId, setSelectedScenarioId] = useState(MOCK_SCENARIOS[0].id);
   
-  // Initialize with structured details from first scenario
+  // Initial structured bug
   const initialBug = {
     ...MOCK_SCENARIOS[0].report,
-    ...generateBugFromObjective(MOCK_SCENARIOS[0].report.title, MOCK_SCENARIOS[0].logs)
+    objective: MOCK_SCENARIOS[0].report.title,
+    preconditions: [
+      "User is browsing as an anonymous guest (not logged in).",
+      "Cart contains items and checkout is initiated.",
+      "Card payment method requires Stripe 3D-Secure authentication."
+    ],
+    stepsToReproduce: [
+      "1. Add products to shopping cart as guest.",
+      "2. Proceed to /checkout and enter billing address.",
+      "3. Submit 3D-Secure credit card authorization.",
+      "4. Observe backend exception response at payment webhook."
+    ],
+    actualResult: "HTTP 500 unhandled exception and order marked UNPAID.",
+    expectedResult: "3DS completes, order is placed, and confirmation page is shown.",
+    moduleName: "TaxCalculationModule",
+    impactedSprint: "Sprint 42 (Q3-Core)",
+    priority: "Critical",
+    severity: "P0 - Blocker",
+    impactedModules: ["CheckoutFlow", "TaxCalculator", "StripeAdapter"]
   };
 
   const [report, setReport] = useState(initialBug);
@@ -44,6 +63,7 @@ export default function App() {
     githubToken: ''
   });
 
+  const [aiConfig, setAiConfig] = useState(DEFAULT_AI_CONFIG);
   const [rubricConfig, setRubricConfig] = useState(DEFAULT_RUBRIC_CONFIG);
 
   // Sync theme attribute on <html> element
@@ -63,13 +83,14 @@ export default function App() {
 
   const executeAnalysis = async (currentReport, currentLogs) => {
     setIsAnalyzing(true);
-    await new Promise(r => setTimeout(r, 400));
+    await new Promise(r => setTimeout(r, 350));
     try {
       const result = await runBugAnalysisAgent({
         report: currentReport,
         logs: currentLogs,
         rubricConfig,
-        mcpConfig
+        mcpConfig,
+        aiConfig
       });
       setAnalysis(result);
     } catch (err) {
@@ -79,10 +100,10 @@ export default function App() {
     }
   };
 
-  const handleSelectScenario = (scenario) => {
+  const handleSelectScenario = async (scenario) => {
     setSelectedScenarioId(scenario.id);
-    const structured = generateBugFromObjective(scenario.report.title, scenario.logs);
-    const merged = { ...scenario.report, ...structured };
+    const structured = await generateBugFromObjective(scenario.report.title, scenario.logs, aiConfig);
+    const merged = { ...scenario.report, ...structured, objective: scenario.report.title };
     setReport(merged);
     setLogs(scenario.logs);
     setCreatedJiraTicket(null);
@@ -161,6 +182,7 @@ export default function App() {
             onCreateJiraBug={handleCreateJiraBug}
             createdJiraTicket={createdJiraTicket}
             isCreatingJira={isCreatingJira}
+            aiConfig={aiConfig}
           />
         </div>
 
@@ -179,7 +201,7 @@ export default function App() {
         <EvidenceTabs analysis={analysis} />
       </div>
 
-      {/* 5. Configuration Modal (Jira & GitHub MCP Connectors) */}
+      {/* 5. Configuration Modal (Jira & GitHub MCP Connectors + AI Engine / Ollama) */}
       <ConfigModal 
         isOpen={isConfigOpen}
         onClose={() => setIsConfigOpen(false)}
@@ -187,6 +209,8 @@ export default function App() {
         setMcpConfig={setMcpConfig}
         rubricConfig={rubricConfig}
         setRubricConfig={setRubricConfig}
+        aiConfig={aiConfig}
+        setAiConfig={setAiConfig}
       />
 
       {/* 6. Step-by-Step MCP Integration Guide Modal */}

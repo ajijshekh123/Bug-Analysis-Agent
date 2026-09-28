@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { 
   FileText, 
   Terminal, 
@@ -15,7 +15,8 @@ import {
   PlusCircle,
   Layers,
   Clock,
-  ShieldAlert
+  ShieldAlert,
+  Bot
 } from 'lucide-react';
 import { generateBugFromObjective } from '../services/bugGenerator';
 
@@ -28,18 +29,26 @@ export function BugInputPanel({
   isAnalyzing,
   onCreateJiraBug,
   createdJiraTicket,
-  isCreatingJira
+  isCreatingJira,
+  aiConfig
 }) {
   const fileInputRef = useRef(null);
   const [objectiveInput, setObjectiveInput] = useState(report.objective || report.title || "");
   const [isGeneratingDetails, setIsGeneratingDetails] = useState(false);
   const [activeTab, setActiveTab] = useState('objective'); // 'objective' or 'details'
 
+  // Keep input in sync with loaded scenario or external report changes
+  useEffect(() => {
+    if (report.objective || report.title) {
+      setObjectiveInput(report.objective || report.title);
+    }
+  }, [report.objective, report.title]);
+
   const handleGenerateFromObjective = async () => {
     if (!objectiveInput.trim()) return;
     setIsGeneratingDetails(true);
-    await new Promise(r => setTimeout(r, 300));
-    const generated = generateBugFromObjective(objectiveInput, logs);
+    await new Promise(r => setTimeout(r, 200));
+    const generated = await generateBugFromObjective(objectiveInput, logs, aiConfig);
     setReport(prev => ({
       ...prev,
       ...generated
@@ -102,9 +111,11 @@ export function BugInputPanel({
                 Bug Objective
               </label>
             </div>
-            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-              AI Auto-creates Preconditions, Steps, Module & Sprint
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span style={{ fontSize: '0.7rem', background: 'rgba(99, 102, 241, 0.15)', color: 'var(--accent-primary)', padding: '2px 8px', borderRadius: '10px', fontWeight: 600 }}>
+                🤖 {aiConfig?.provider === 'ollama' ? 'Ollama AI' : 'Dynamic AI'}
+              </span>
+            </div>
           </div>
 
           <div style={{ display: 'flex', gap: '0.5rem' }}>
