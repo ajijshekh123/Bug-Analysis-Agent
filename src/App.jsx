@@ -8,18 +8,29 @@ import { McpIntegrationGuideModal } from './components/McpIntegrationGuideModal'
 import { MOCK_SCENARIOS } from './data/mockScenarios';
 import { DEFAULT_RUBRIC_CONFIG } from './skills/triageRubric';
 import { runBugAnalysisAgent } from './services/agentEngine';
-import { mcpLinkBugAsDuplicate } from './mcp/jiraMcp';
-import { Sparkles, Zap } from 'lucide-react';
+import { mcpLinkBugAsDuplicate, mcpCreateJiraBug } from './mcp/jiraMcp';
+import { generateBugFromObjective } from './services/bugGenerator';
+import { Sparkles } from 'lucide-react';
 
 export default function App() {
+  const [theme, setTheme] = useState(localStorage.getItem('sentinx_theme') || 'dark');
   const [selectedScenarioId, setSelectedScenarioId] = useState(MOCK_SCENARIOS[0].id);
-  const [report, setReport] = useState(MOCK_SCENARIOS[0].report);
+  
+  // Initialize with structured details from first scenario
+  const initialBug = {
+    ...MOCK_SCENARIOS[0].report,
+    ...generateBugFromObjective(MOCK_SCENARIOS[0].report.title, MOCK_SCENARIOS[0].logs)
+  };
+
+  const [report, setReport] = useState(initialBug);
   const [logs, setLogs] = useState(MOCK_SCENARIOS[0].logs);
   const [analysis, setAnalysis] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isMcpGuideOpen, setIsMcpGuideOpen] = useState(false);
   const [linkedBugs, setLinkedBugs] = useState({});
+  const [createdJiraTicket, setCreatedJiraTicket] = useState(null);
+  const [isCreatingJira, setIsCreatingJira] = useState(false);
 
   const [mcpConfig, setMcpConfig] = useState({
     jiraEnabled: true,
@@ -35,6 +46,16 @@ export default function App() {
 
   const [rubricConfig, setRubricConfig] = useState(DEFAULT_RUBRIC_CONFIG);
 
+  // Sync theme attribute on <html> element
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('sentinx_theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  };
+
   // Automatically run initial analysis for a lively first view
   useEffect(() => {
     executeAnalysis(report, logs);
@@ -42,8 +63,7 @@ export default function App() {
 
   const executeAnalysis = async (currentReport, currentLogs) => {
     setIsAnalyzing(true);
-    // Add brief latency for smooth agent feel
-    await new Promise(r => setTimeout(r, 450));
+    await new Promise(r => setTimeout(r, 400));
     try {
       const result = await runBugAnalysisAgent({
         report: currentReport,
@@ -61,17 +81,35 @@ export default function App() {
 
   const handleSelectScenario = (scenario) => {
     setSelectedScenarioId(scenario.id);
-    setReport(scenario.report);
+    const structured = generateBugFromObjective(scenario.report.title, scenario.logs);
+    const merged = { ...scenario.report, ...structured };
+    setReport(merged);
     setLogs(scenario.logs);
-    executeAnalysis(scenario.report, scenario.logs);
+    setCreatedJiraTicket(null);
+    executeAnalysis(merged, scenario.logs);
   };
 
   const handleRunAnalysis = () => {
     executeAnalysis(report, logs);
   };
 
+  const handleCreateJiraBug = async () => {
+    setIsCreatingJira(true);
+    await new Promise(r => setTimeout(r, 450));
+    try {
+      const res = await mcpCreateJiraBug(report, logs, mcpConfig);
+      if (res.success) {
+        setCreatedJiraTicket(res.ticket);
+      }
+    } catch (err) {
+      console.error("Error creating Jira bug:", err);
+    } finally {
+      setIsCreatingJira(false);
+    }
+  };
+
   const handleLinkDuplicate = async (targetKey) => {
-    const currentKey = report.component ? `${report.component.toUpperCase().slice(0, 3)}-PENDING` : "NEW-BUG";
+    const currentKey = createdJiraTicket ? createdJiraTicket.key : "CURRENT-BUG";
     const res = await mcpLinkBugAsDuplicate(currentKey, targetKey, mcpConfig);
     if (res.success) {
       setLinkedBugs(prev => ({ ...prev, [targetKey]: true }));
@@ -80,19 +118,21 @@ export default function App() {
 
   return (
     <div className="app-container">
-      {/* 1. Header Navigation */}
+      {/* 1. Header Navigation with Theme Switcher & Status Pills */}
       <Navbar 
         onOpenConfig={() => setIsConfigOpen(true)}
         onOpenMcpGuide={() => setIsMcpGuideOpen(true)}
         mcpConfig={mcpConfig}
+        theme={theme}
+        onToggleTheme={toggleTheme}
         isAnalyzing={isAnalyzing}
       />
 
-      {/* 2. Quick Scenario Presets Toolbar */}
+      {/* 2. Quick Incident Preset Scenarios Toolbar */}
       <div className="scenarios-toolbar">
         <div className="scenarios-label" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-          <Sparkles size={14} style={{ color: '#818cf8' }} />
-          <span>💡 Try an Example Incident:</span>
+          <Sparkles size={14} style={{ color: 'var(--accent-primary)' }} />
+          <span>💡 Quick Incident Objectives:</span>
         </div>
         <div className="scenario-chips-wrapper">
           {MOCK_SCENARIOS.map((scenario) => (
@@ -109,7 +149,7 @@ export default function App() {
 
       {/* 3. Main Workspace Grid */}
       <main className="workspace-grid">
-        {/* Left Column: Input (Bug Report + Logs) */}
+        {/* Left Column: Input (Bug Objective, Structured Details, Logs, Jira Auto-Create) */}
         <div>
           <BugInputPanel 
             report={report}
@@ -118,10 +158,13 @@ export default function App() {
             setLogs={setLogs}
             onRunAnalysis={handleRunAnalysis}
             isAnalyzing={isAnalyzing}
+            onCreateJiraBug={handleCreateJiraBug}
+            createdJiraTicket={createdJiraTicket}
+            isCreatingJira={isCreatingJira}
           />
         </div>
 
-        {/* Right Column: Output (Severity, Likely Root Cause, Next Steps, Duplicate Bugs) */}
+        {/* Right Column: Output (Outage Level, Root Cause, Impacted Modules, Logs Analysis, Action Plan, Duplicates) */}
         <div>
           <TriageResultPanel 
             analysis={analysis}
@@ -132,11 +175,11 @@ export default function App() {
       </main>
 
       {/* 4. Underlying MCP Evidence & Log Analysis Inspector */}
-      <div style={{ maxWidth: '1720px', margin: '0 auto', padding: '0 1.75rem 2.5rem', width: '100%' }}>
+      <div style={{ maxWidth: '1720px', margin: '0 auto', padding: '0 1.75rem 2rem', width: '100%' }}>
         <EvidenceTabs analysis={analysis} />
       </div>
 
-      {/* 5. Configuration Modal */}
+      {/* 5. Configuration Modal (Jira & GitHub MCP Connectors) */}
       <ConfigModal 
         isOpen={isConfigOpen}
         onClose={() => setIsConfigOpen(false)}
@@ -151,6 +194,13 @@ export default function App() {
         isOpen={isMcpGuideOpen}
         onClose={() => setIsMcpGuideOpen(false)}
       />
+
+      {/* 7. Footer: Prepared and Analysed by Mohammad Ajij Shekh, 2026 */}
+      <footer className="app-footer">
+        <div style={{ maxWidth: '1720px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
+          <span>Prepared and Analysed by <strong className="footer-highlight">Mohammad Ajij Shekh, 2026</strong></span>
+        </div>
+      </footer>
     </div>
   );
 }

@@ -183,11 +183,28 @@ export async function runBugAnalysisAgent({
     badgeType: "neutral"
   });
 
+  // Calculate Outage Level
+  let criticalOutageLevel = "🟢 LOW RISK (Cosmetic / Low Priority)";
+  if (triageEvaluation.severity === "P0") {
+    criticalOutageLevel = "🚨 CRITICAL OUTAGE (Active Revenue Loss & User Blocker)";
+  } else if (triageEvaluation.severity === "P1") {
+    criticalOutageLevel = "⚠️ HIGH SEVERITY DEGRADATION (Core Functionality Blocked)";
+  } else if (triageEvaluation.severity === "P2") {
+    criticalOutageLevel = "⚡ MODERATE OUTAGE (Performance & Secondary Features Degraded)";
+  }
+
+  const impactedModules = report.impactedModules && report.impactedModules.length > 0 
+    ? report.impactedModules 
+    : [report.component || "CoreService", report.moduleName || "BusinessLogic", "ApiGateway", "DatabaseAdapter"];
+
   return {
     triageEvaluation,
     logAnalysis,
     likelyRootCause,
     nextSteps,
+    actionPlan: nextSteps,
+    impactedModules,
+    criticalOutageLevel,
     duplicateCandidates,
     githubEvidence,
     analyzedAt: new Date().toISOString()

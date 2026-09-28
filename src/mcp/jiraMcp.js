@@ -166,3 +166,48 @@ export async function mcpLinkBugAsDuplicate(sourceKey, targetKey, config = {}) {
     timestamp: new Date().toISOString()
   };
 }
+
+let issueCounter = 1049;
+
+/**
+ * MCP Tool: Create Bug automatically in Jira board
+ */
+export async function mcpCreateJiraBug(bugDetails, logs = "", config = {}) {
+  const projectKey = config.jiraProject || (bugDetails.component?.toUpperCase().slice(0, 4) || "CORE");
+  const issueKey = `${projectKey}-${issueCounter++}`;
+  const host = config.jiraHost || "https://company.atlassian.net";
+
+  const newTicket = {
+    key: issueKey,
+    summary: bugDetails.title,
+    description: bugDetails.description,
+    objective: bugDetails.objective,
+    status: "TO DO",
+    resolution: "Unresolved",
+    component: bugDetails.component || "General",
+    moduleName: bugDetails.moduleName || "CoreModule",
+    priority: bugDetails.priority || "High",
+    severity: bugDetails.severity || "P1",
+    impactedSprint: bugDetails.impactedSprint || "Sprint 42 (Current)",
+    preconditions: bugDetails.preconditions || [],
+    stepsToReproduce: bugDetails.stepsToReproduce || [],
+    actualResult: bugDetails.actualResult || "",
+    expectedResult: bugDetails.expectedResult || "",
+    assignee: "Mohammad Ajij Shekh",
+    reporter: "SentinX AI Agent",
+    boardUrl: `${host}/browse/${issueKey}`,
+    created: new Date().toISOString(),
+    linkedDuplicates: []
+  };
+
+  // Add to active database
+  MOCK_JIRA_DB.unshift(newTicket);
+
+  return {
+    success: true,
+    issueKey,
+    ticket: newTicket,
+    message: `Jira Bug ${issueKey} created successfully on the board!`
+  };
+}
+
